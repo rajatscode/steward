@@ -202,6 +202,13 @@ public actor AgentLoop {
     /// Pure-function state transition. Exposed to tests via the `internal`
     /// import on the test target; the production path always goes through
     /// `run(userMessage:)`.
+    ///
+    /// Per team-lead deslop S1 follow-ups:
+    ///   - `.awaitingLifeAreaAnswer → .awaitingDomainConfirm` now requires
+    ///     the user to have answered substantively (not refused).
+    ///   - `.capturedAwaitingTrackOffer where isYes → .awaitingInstrumentConfirm`
+    ///     per UXR §3.3 reading (the team is proposed and confirmed in
+    ///     sequence — instrument creation is a logical follow-on step).
     func nextConversationState(
         prior: ConversationState,
         branch: EmptyStateBranch?,
@@ -211,32 +218,33 @@ public actor AgentLoop {
         guard activeDomainsEmpty else {
             return .inFreeChat
         }
-        let lowered = userMessage.lowercased()
         // Honor explicit branch transitions first.
         if let branch {
             switch branch {
             case .branchACaptureFirst:
-                // capture-first → after the LLM replies, we're waiting on
-                // a yes/no to the retroactive offer.
                 return .capturedAwaitingTrackOffer
             case .branchBSetupFirst:
-                // setup-first → expecting the life-area answer next.
                 return .awaitingLifeAreaAnswer
             case .branchCUnclear:
                 return .unclearOnRamp
             }
         }
-        // Confirmation flow transitions (no branch, mid-script).
-        let isYes = ["yes", "yeah", "yep", "confirm", "sounds good", "do it", "ok"]
-            .contains(where: { lowered.contains($0) })
+
+        let yesNo = Self.classifyAffirmation(userMessage)
         switch prior {
         case .awaitingLifeAreaAnswer:
-            return .awaitingDomainConfirm
-        case .awaitingDomainConfirm where isYes:
+            // The user just named a life area. Only advance to the domain-
+            // confirm step if they didn't refuse — explicit "no" / "skip"
+            // bounces back to free chat per UXR §4 spirit (the user can
+            // pull out anytime).
+            return yesNo.isRefusal ? .inFreeChat : .awaitingDomainConfirm
+        case .awaitingDomainConfirm where yesNo.isAffirmative:
             return .awaitingInstrumentConfirm
-        case .awaitingInstrumentConfirm where isYes:
+        case .awaitingInstrumentConfirm where yesNo.isAffirmative:
             return .inFreeChat
-        case .capturedAwaitingTrackOffer where isYes:
+        case .capturedAwaitingTrackOffer where yesNo.isAffirmative:
+            return .awaitingInstrumentConfirm
+        case .capturedAwaitingTrackOffer where yesNo.isRefusal:
             return .inFreeChat
         case .capturedAwaitingTrackOffer,
              .awaitingDomainConfirm,
@@ -248,6 +256,63 @@ public actor AgentLoop {
              .inFreeChat:
             return prior
         }
+    }
+
+    /// Trinary classification of user-confirmation messages.
+    ///
+    /// Per deslop S2: substring matching is too aggressive ("no okay" →
+    /// matches "ok"; "yeah no" → matches "yeah"). Tokenize on whitespace
+    /// (NOT on apostrophes — we want "don't" / "let's" intact), strip
+    /// surrounding punctuation from each token, then look at leading
+    /// 1/2/3-token windows, plus a guard against any negation token.
+    static func classifyAffirmation(_ raw: String) -> AffirmationClassification {
+        let tokens = raw
+            .lowercased()
+            .components(separatedBy: .whitespacesAndNewlines)
+            .map { $0.trimmingCharacters(in: .punctuationCharacters) }
+            .filter { !$0.isEmpty }
+
+        guard let leading = tokens.first else {
+            return .unclear
+        }
+
+        let refusalSet: Set<String> = ["no", "nope", "nah", "skip", "don't", "dont", "stop", "never"]
+        let affirmativeLead: Set<String> = ["yes", "yeah", "yep", "yup", "confirm", "ok", "okay", "sure", "absolutely"]
+
+        // Negation anywhere in the message poisons affirmation.
+        let hasRefusalToken = tokens.contains(where: { refusalSet.contains($0) })
+        if hasRefusalToken {
+            return .refusal
+        }
+
+        if affirmativeLead.contains(leading) {
+            return .affirmative
+        }
+
+        // Multi-word affirmatives. Check leading 2-token and 3-token
+        // windows ("sounds good", "do it", "go for it", "let's do it").
+        let firstTwo = tokens.prefix(2).joined(separator: " ")
+        let firstThree = tokens.prefix(3).joined(separator: " ")
+        let multiWordAffirmatives: Set<String> = [
+            "sounds good", "do it", "go for it",
+            "let's do it", "lets do it",
+        ]
+        if multiWordAffirmatives.contains(firstTwo)
+            || multiWordAffirmatives.contains(firstThree)
+        {
+            return .affirmative
+        }
+
+        return .unclear
+    }
+
+    enum AffirmationClassification: Equatable {
+        case affirmative
+        case refusal
+        case unclear
+
+        var isAffirmative: Bool { self == .affirmative }
+        var isRefusal: Bool { self == .refusal }
     }
 
     /// Tests + Track E's chat-replay path read the current state to render
@@ -381,10 +446,20 @@ public struct AgentHandoffTool: LLMTool {
     }
 
     private func errorJSON(kind: String, detail: String) -> String {
-        // Stable, compact, no random ordering — pure function of inputs.
-        let escapedDetail = detail
-            .replacingOccurrences(of: "\\", with: "\\\\")
-            .replacingOccurrences(of: "\"", with: "\\\"")
-        return "{\"error\":\"\(kind)\",\"detail\":\"\(escapedDetail)\"}"
+        // Deslop S7: hand-rolled string escaping doesn't cover newlines /
+        // control chars / unicode quirks. Use JSONEncoder on a real dict
+        // so the output is always valid JSON.
+        let payload: [String: String] = ["error": kind, "detail": detail]
+        let enc = JSONEncoder()
+        enc.outputFormatting = [.sortedKeys] // stable, diff-friendly
+        if let data = try? enc.encode(payload),
+           let s = String(data: data, encoding: .utf8)
+        {
+            return s
+        }
+        // Encoding [String:String] cannot realistically fail; on the
+        // pathological "out of memory" case fall back to a minimal but
+        // valid JSON object so the LLM still sees a parseable tool result.
+        return "{\"error\":\"\(kind)\"}"
     }
 }

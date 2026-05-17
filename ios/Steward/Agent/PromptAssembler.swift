@@ -167,6 +167,13 @@ public struct PromptAssembler: Sendable {
                 - When `domains.count == 0`, follow the empty-state flow signaled by the \
                 runtime context block below. The branch and conversation state are already \
                 determined deterministically before this call — do NOT re-route.
+                - **Use the verbatim copy templates in the runtime_context block** under \
+                `empty_state_copy_templates:`. Pick the template that matches the active \
+                branch + state and emit it as your reply. You may adapt phrasing slightly \
+                for warmth or grammar, but stay on-script: keep the single-question \
+                structure, keep the concrete examples, keep the open-ended close. NEVER \
+                paraphrase by inventing new framings ("what's been hardest to keep up with", \
+                "let's get back on track" — all v2 §8 banned patterns still apply).
                 - Hand off via `agent.handoff(domain, message)` only when the request \
                 clearly belongs to an existing domain. Each handoff consumes one budget \
                 hop; aim for zero or one per turn.
@@ -212,24 +219,19 @@ public struct PromptAssembler: Sendable {
         lines.append("conversation_state: \(runtime.conversationState.mockHintToken)")
         if let branch = runtime.emptyStateBranch {
             lines.append("empty_state_branch: \(branch.mockHintToken)")
-            // Verbatim copy hints from coordinator-empty-state-v2 §3–§5.
-            // The LLM has the latitude to phrase but must stay on-script.
-            switch branch {
-            case .branchACaptureFirst:
-                lines.append("branch_a_guidance: Capture the event via event.capture FIRST. " +
-                    "Then acknowledge in one short sentence — do not parrot verbatim. " +
-                    "If the event implies a recurring concern (sleep, weight, money, mood, " +
-                    "a chore), offer to start a track in one short sentence ending with a " +
-                    "yes/no question. If it's a one-off, just acknowledge.")
-            case .branchBSetupFirst:
-                lines.append("branch_b_guidance: Ask one open question about what they'd " +
-                    "like you to help carry. Examples: sleep, money, the kitchen, hobbies. " +
-                    "Use natural verbs ('track', 'keep'), never 'domain' or 'instrument'.")
-            case .branchCUnclear:
-                lines.append("branch_c_guidance: Offer a concrete easy on-ramp — log " +
-                    "one thing about today, sleep or breakfast. No pressure. No follow-up " +
-                    "nudge in this session.")
-            }
+
+            // Inject the FULL verbatim §1.1/§3/§4/§5 copy templates for
+            // the active branch. The coordinator's role_prompt instructs
+            // it to pick the matching template and emit it as-is (with
+            // minor grammar adaptation only). Deslop B3.
+            var cal = Calendar(identifier: .gregorian)
+            cal.timeZone = runtime.localTimezone
+            let nowLocalHour = cal.component(.hour, from: runtime.now)
+            lines.append(CoordinatorEmptyStateCopy.runtimeContextBlock(
+                branch: branch,
+                state: runtime.conversationState,
+                nowLocalHour: nowLocalHour
+            ))
         }
 
         switch role {

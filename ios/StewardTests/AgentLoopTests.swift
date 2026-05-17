@@ -190,6 +190,42 @@ final class AgentLoopTests: XCTestCase {
         )
         let r = try await handoff.invoke(argsJSON: "not json at all")
         XCTAssertTrue(r.contains("malformed_args"))
+        // Deslop S7: error JSON must always be valid JSON regardless of
+        // what control chars the detail string contains.
+        let parsed = try JSONSerialization.jsonObject(with: Data(r.utf8))
+        XCTAssertTrue(parsed is [String: Any])
+    }
+
+    // MARK: - S7 — errorJSON survives newlines + quotes in detail string
+
+    func test_handoff_errorJSON_isAlwaysValidJSON_evenWithControlChars() async throws {
+        let factory = MockLLMSessionFactory()
+        let registry = MapToolRegistry()
+        let resolver = FixtureDomainAgentResolver(domains: [])
+        let budget = SharedBudget(budget: TurnBudget(
+            handoffsRemaining: TurnBudget.defaultHandoffs,
+            contextTokenCeiling: 6_000,
+            startedAt: Date()
+        ))
+        let handoff = AgentHandoffTool(
+            budget: budget,
+            resolver: resolver,
+            registry: registry,
+            factory: factory,
+            temperature: 0.7,
+            timezone: .autoupdatingCurrent,
+            clock: { Date() }
+        )
+        // Force malformed args parsing to surface an error JSON; the args
+        // here will fail JSON decoding because they're not a JSON object,
+        // which will exercise the errorJSON path.
+        let r = try await handoff.invoke(argsJSON: "broken\n\"input\\with\\backslashes")
+        // Result must be parseable JSON regardless of input weirdness.
+        let parsed = try JSONSerialization.jsonObject(with: Data(r.utf8))
+        guard let dict = parsed as? [String: Any] else {
+            XCTFail("error JSON not a top-level object"); return
+        }
+        XCTAssertNotNil(dict["error"])
     }
 }
 
