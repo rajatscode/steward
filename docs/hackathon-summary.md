@@ -1,6 +1,20 @@
 # Steward — hackathon session summary
 
-`main` at `089d81f`, tagged `v0.9-sunday-morning`. 222/222 tests pass. Read this before opening Xcode; then go to [`docs/sunday-morning-startup.md`](sunday-morning-startup.md) for the toolchain steps and [`docs/first-morning.md`](first-morning.md) for what the coordinator will say.
+`main` at `73ad66a`, tagged **`v0.9.1-sunday-morning`** (recommended current). `v0.9-sunday-morning` at `089d81f` retained as the known-good fallback if anything in the v0.9.1 polish patches misbehaves on a real device. Test suite green; nemesis re-gated PASS at v0.9.1; qa-1 re-walk in flight at the time of writing. Read this before opening Xcode; then go to [`docs/sunday-morning-startup.md`](sunday-morning-startup.md) for the toolchain steps and [`docs/first-morning.md`](first-morning.md) for what the coordinator will say.
+
+---
+
+## v0.9.1 enhancements
+
+Three polish patches landed on top of `v0.9-sunday-morning`. Each closed a known v1 gap that was previously listed as a v1.1 deferral; those items are struck through below.
+
+1. **Full undo coverage across Pod C** (`51ebbc5` + follow-on `49a6f91`). All twelve mutating Pod C tools are now reversible — the eight previously omitted (`instrument.create`, `instrument.update_definition`, `instrument.archive`, the four `commitment.*` tools, `memory.strengthen`, and `domain.update_prompt`) have working inverse handlers, with seven new `InverseAction` cases and a parity assertion at 20 entries. What this means for the user: every agent action in the Settings audit log has a working undo button, no dead-ends.
+
+2. **iCloud Drive sandbox surfacing** (`390a79e` + follow-on `6bf1694`). When iCloud Drive isn't available, the CSV mirror still works (writes to the app sandbox) but Settings now shows a typed availability state with differentiated copy and an inline banner explaining where the CSVs actually live. What this means for the user: no more silent downgrade — if you can't find your CSVs in iCloud Drive's `Steward/` folder, the app tells you why and where they are instead.
+
+3. **Tap-to-act notification routing end-to-end** (`73ad66a` + follow-on `36f3585`). `UNUserNotificationCenterDelegate` is wired with a typed `action_context_json` decoder; `ChatView` drains a cold-launch buffer on first appear and subscribes via `.onReceive` for warm-launch routes; malformed payloads route to a `systemNote` rather than silent-dropping. What this means for the user: tapping a Steward notification from the lockscreen lands on the correct screen and the coordinator runs the tailored one-turn loop the notification was scheduled with — including DoD #8 (morning brief tap → Today brief).
+
+These were the three highest-touch items on the v1.1 list. The remaining items in the deferral lists below are genuine v1.1+ work.
 
 ---
 
@@ -47,11 +61,11 @@ From spec §21 (deferred by design):
 
 Identified by qa-1 / nemesis as known v1 gaps, intentional cuts to keep the build green:
 
-- 8 of 13 Pod C tools are not yet undoable — `instrument.create`, `instrument.update_definition`, `instrument.archive`, the four `commitment.*` tools, `memory.strengthen`, and `domain.update_prompt` are omitted from `externallyMutating` in the audit log rather than rendering dead-end Undo buttons. The other 5 (`instrument.apply_event`, `domain.create`, `commitment.create`, `memory.save`, plus calendar/reminder/notification writes) are fully undoable. — **v1.1**
+- ~~8 of 13 Pod C tools are not yet undoable — `instrument.create`, `instrument.update_definition`, `instrument.archive`, the four `commitment.*` tools, `memory.strengthen`, and `domain.update_prompt` are omitted from `externallyMutating` in the audit log rather than rendering dead-end Undo buttons. The other 5 (`instrument.apply_event`, `domain.create`, `commitment.create`, `memory.save`, plus calendar/reminder/notification writes) are fully undoable.~~ — **resolved in v0.9.1** (`51ebbc5`): all 12 mutating Pod C tools now reversible; parity assert at 20.
 - Memory decay job not auto-invoked — the decay function exists and tests pass, but is not wired to a `BGProcessingTask` schedule yet; runs on demand only. — **v1.1**
-- iCloud Drive sandbox silent downgrade — if iCloud Drive is disabled, the CSV mirror falls back to the app sandbox without surfacing a banner. App works fully, but the user won't see the CSVs in Files.app until they enable iCloud Drive and the next sync drains. — **v1.1**
+- ~~iCloud Drive sandbox silent downgrade — if iCloud Drive is disabled, the CSV mirror falls back to the app sandbox without surfacing a banner. App works fully, but the user won't see the CSVs in Files.app until they enable iCloud Drive and the next sync drains.~~ — **resolved in v0.9.1** (`390a79e`): typed availability state + differentiated Settings copy + inline banner now surface where the CSVs actually live.
 - Settings UI mutations not audit-logged — toggling quiet hours, mercy, or pause from the Settings UI persists correctly but doesn't emit an `events` row. The same mutations made via chat tools (`mercy_mode.engage`, `quiet_hours.set`) do emit events. — **v1.1**
-- Tap-to-act notification context routing not end-to-end verified — the `action_context_json` round-trip is unit-tested, but tap-from-lockscreen → app opens to the correct screen → coordinator runs the tailored one-turn loop has not been exercised on a real device. — **v1.1**
+- ~~Tap-to-act notification context routing not end-to-end verified — the `action_context_json` round-trip is unit-tested, but tap-from-lockscreen → app opens to the correct screen → coordinator runs the tailored one-turn loop has not been exercised on a real device.~~ — **resolved in v0.9.1** (`73ad66a`): `UNUserNotificationCenterDelegate` wired with typed-context decoder; `ChatView` drains cold-launch buffer and subscribes via `.onReceive` for warm-launch; malformed payloads route to `systemNote` rather than silent-drop. Real-device tap path still wants a thumbs-up on first launch, but the E2E plumbing is in.
 
 ## Trust receipts
 
