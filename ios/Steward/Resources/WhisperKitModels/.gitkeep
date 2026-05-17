@@ -1,0 +1,11 @@
+WhisperKit model directory.
+
+This folder is intentionally checked in empty (via this .gitkeep). Real model
+files (~1.6GB for whisper-large-v3-turbo) are NOT committed — run
+`scripts/fetch-whisperkit-model.sh` once before building for device to
+populate this directory.
+
+The CSVMirror / Voice subsystems will refuse to lazy-download at runtime
+(implementation-addendum §4 hard reject #15). If this directory is empty at
+launch, `VoiceCaptureService.initializeIfNeeded()` returns readiness
+`.unavailable(.modelMissing(...))` and the UI disables the mic button.
