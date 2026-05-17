@@ -13,7 +13,6 @@
 //
 
 import Foundation
-import GRDB
 
 public actor UndoExecutor {
     public static let shared = UndoExecutor()
@@ -119,38 +118,33 @@ public actor UndoExecutor {
         // ---- Reminders ----
 
         case .recreateReminder(let payload):
-            // For undo-of-complete, we don't recreate (the reminder still
-            // exists). For undo-of-delete (future), we'd recreate. Detect by
-            // whether ekReminderID is present.
+            // Two undo paths converge here:
+            //  - undo-of-complete: payload.ekReminderID is set, reminder still
+            //    exists in the store; flip `isCompleted` back to false.
+            //  - undo-of-delete: payload.ekReminderID is empty/missing;
+            //    recreate from the captured payload.
+            // Pod D owns both gateway methods (reopen + create), so the
+            // executor can run real handlers in v1 — not notYetImplemented.
             if let ekID = payload.ekReminderID, !ekID.isEmpty {
-                // Flip the completed flag back to false through the gateway.
-                // We can't go through `executeReminderComplete` because that's
-                // a one-way flag flip. Open a fresh executor path via the
-                // EventStore directly is HARD REJECT #18 territory — instead,
-                // for v1 we surface this as a backend failure that the UI can
-                // explain. Track B can add an explicit `executeReminderReopen`
-                // method to the gateway when polish lands.
-                throw UndoExecutorError.backendFailure(
-                    "Reopen-reminder undo requires gateway support not yet shipped (\(ekID))"
+                let result = await gateway.executeReminderReopen(ekReminderID: ekID)
+                try requireOK(result)
+            } else {
+                let args = ReminderCreateArgs(
+                    title: payload.title,
+                    dueDate: payload.dueDate,
+                    notes: payload.notes,
+                    listName: payload.listName,
+                    reasoning: "undo:recreate_reminder"
                 )
+                let (result, _) = await gateway.executeReminderCreate(args)
+                try requireOK(result)
             }
-            let args = ReminderCreateArgs(
-                title: payload.title,
-                dueDate: payload.dueDate,
-                notes: payload.notes,
-                listName: payload.listName,
-                reasoning: "undo:recreate_reminder"
-            )
-            let (result, _) = await gateway.executeReminderCreate(args)
-            try requireOK(result)
 
         case .deleteReminder(let ekReminderID, _):
-            // Inverse of reminder.create — needs gateway support not yet
-            // exposed (we don't ship reminder.delete as a primary tool in
-            // v1). Surface a typed failure so UI can explain.
-            throw UndoExecutorError.backendFailure(
-                "Delete-reminder undo not implemented in v1 (\(ekReminderID))"
-            )
+            // Inverse of reminder.create — route through the gateway's
+            // delete path so permission gating still applies.
+            let result = await gateway.executeReminderDelete(ekReminderID: ekReminderID)
+            try requireOK(result)
 
         // ---- Notifications ----
 
@@ -163,62 +157,23 @@ public actor UndoExecutor {
         case .cancelNotification(let notificationID):
             await scheduler.cancel(id: notificationID)
 
-        // ---- Instrument replay (delegated to Track C registry) ----
+        // ---- Cross-pod cases (Track C owns the real handlers) ----
+        //
+        // Per arch's redirect: NOT-YET-IMPLEMENTED uses explicit case +
+        // typed throw. NO `default:` arm — the compiler still enforces
+        // exhaustiveness, and Pod C's commit swaps these throws for real
+        // handlers without touching Track D code.
 
-        case .revertInstrumentEvent(let instrumentID, let eventIDToReverse):
-            // Spec §1.6: replay all events for the instrument EXCEPT the
-            // named one and recompute state from initialState. The actual
-            // replay loop lives in Track C's InstrumentRegistry; we surface
-            // the call here so Track B's UI can wire it without coupling
-            // directly to that file.
-            try await InstrumentReplayBridge.replay(
-                instrumentID: instrumentID,
-                excluding: eventIDToReverse,
-                in: try await provider.database()
-            )
-
-        // ---- Domain archive ----
-
-        case .archiveDomain(let domain, let archivedAt):
-            let queue = try await provider.database()
-            try await queue.write { db in
-                try db.execute(
-                    sql: "UPDATE domains SET archived_at = ? WHERE domain = ?",
-                    arguments: [Int64(archivedAt.timeIntervalSince1970 * 1000), domain]
-                )
-            }
-
-        case .unarchiveDomain(let domain):
-            let queue = try await provider.database()
-            try await queue.write { db in
-                try db.execute(
-                    sql: "UPDATE domains SET archived_at = NULL WHERE domain = ?",
-                    arguments: [domain]
-                )
-            }
-
-        // ---- Memory ----
-
-        case .forgetMemory(let memoryID):
-            // Forgetting writes a soft-delete event; the actual delete from
-            // memory_items lives in Track C. From here we just call the
-            // delete path; if Track C hasn't wired it yet this is a no-op
-            // that the integration test will catch.
-            let queue = try await provider.database()
-            try await queue.write { db in
-                try db.execute(
-                    sql: "DELETE FROM memory_items WHERE memory_id = ?",
-                    arguments: [memoryID.rawValue]
-                )
-            }
-
-        case .unforgetMemory(let memoryID):
-            // Restore a previously forgotten memory. Track C owns the
-            // soft-delete archive; we surface a backend failure until that
-            // archive lands so callers get a clear message.
-            throw UndoExecutorError.backendFailure(
-                "Memory restore (\(memoryID.rawValue)) requires Track C archive table not yet shipped"
-            )
+        case .revertInstrumentEvent:
+            throw UndoExecutorError.notYetImplemented(.revertInstrumentEvent)
+        case .archiveDomain:
+            throw UndoExecutorError.notYetImplemented(.archiveDomain)
+        case .unarchiveDomain:
+            throw UndoExecutorError.notYetImplemented(.unarchiveDomain)
+        case .forgetMemory:
+            throw UndoExecutorError.notYetImplemented(.forgetMemory)
+        case .unforgetMemory:
+            throw UndoExecutorError.notYetImplemented(.unforgetMemory)
         }
     }
 
@@ -235,14 +190,3 @@ public actor UndoExecutor {
     }
 }
 
-/// Bridge type so UndoExecutor doesn't `import Track C`. Track C provides the
-/// real implementation; v1 stub returns success without doing anything (the
-/// integration test catches the missing wiring).
-enum InstrumentReplayBridge {
-    static func replay(instrumentID: String, excluding: EventID, in db: DatabaseQueue) async throws {
-        // Track C's InstrumentRegistry.replay(...) is where this hooks once
-        // landed. Until then, the executor records the intent (the audit
-        // event written by `recordUndo`) but doesn't mutate state.
-        _ = (instrumentID, excluding, db)
-    }
-}

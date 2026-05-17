@@ -415,6 +415,48 @@ public actor EventKitGateway {
         return .ok(payloadJSON: "{\"completed\":true}")
     }
 
+    /// Reopen a completed reminder (sets `isCompleted = false`). Used by the
+    /// undo path for `reminder.complete`. Public so `UndoExecutor` can reach
+    /// it without re-implementing the EventKit call there (which would be
+    /// HARD REJECT #18 territory).
+    public func executeReminderReopen(ekReminderID: String) async -> CalendarToolResult {
+        let scope: EKPermissionScope = .remindersFullAccess
+        switch await gateCheck(scope: scope) {
+        case .ok: break
+        case .permissionRequired: return .permissionRequired(scope: scope)
+        case .permissionDenied(let s, let h): return .permissionDenied(scope: s, hint: h)
+        }
+        guard let item = store.calendarItem(withIdentifier: ekReminderID) as? EKReminder else {
+            return .ok(payloadJSON: "{\"reopened\":false,\"reason\":\"not_found\"}")
+        }
+        item.isCompleted = false
+        do {
+            try store.save(item, commit: true)
+        } catch {
+            return .permissionDenied(scope: scope, hint: "Reminder save failed: \(error.localizedDescription)")
+        }
+        return .ok(payloadJSON: "{\"reopened\":true}")
+    }
+
+    /// Delete a reminder. Used by the undo path for `reminder.create`.
+    public func executeReminderDelete(ekReminderID: String) async -> CalendarToolResult {
+        let scope: EKPermissionScope = .remindersFullAccess
+        switch await gateCheck(scope: scope) {
+        case .ok: break
+        case .permissionRequired: return .permissionRequired(scope: scope)
+        case .permissionDenied(let s, let h): return .permissionDenied(scope: s, hint: h)
+        }
+        guard let item = store.calendarItem(withIdentifier: ekReminderID) as? EKReminder else {
+            return .ok(payloadJSON: "{\"deleted\":false,\"reason\":\"not_found\"}")
+        }
+        do {
+            try store.remove(item, commit: true)
+        } catch {
+            return .permissionDenied(scope: scope, hint: "Reminder remove failed: \(error.localizedDescription)")
+        }
+        return .ok(payloadJSON: "{\"deleted\":true}")
+    }
+
     public func executeReminderList(_ args: ReminderListArgs) async -> CalendarToolResult {
         let scope: EKPermissionScope = .remindersFullAccess
         switch await gateCheck(scope: scope) {

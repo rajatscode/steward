@@ -44,6 +44,49 @@ final class UndoExecutorTests: XCTestCase {
             .unforgetMemory(memoryID: MemoryID(rawValue: "m-1"))
         ]
         XCTAssertEqual(cases.count, 12, "InverseAction case count drift: did you add a case without updating UndoExecutor?")
+
+        // Parity: every InverseAction must map to an InverseActionKind. If
+        // someone adds a case to one enum but forgets the other, the
+        // `.kind` switch in TurnAction.swift fails to compile — but this
+        // assertion guards the *count* parity at runtime so deslop catches
+        // a mismatched rename even if the switch happens to compile.
+        XCTAssertEqual(
+            cases.count,
+            InverseActionKind.allCases.count,
+            "InverseAction and InverseActionKind drifted apart."
+        )
+        let kinds = cases.map(\.kind)
+        XCTAssertEqual(Set(kinds).count, kinds.count, "`.kind` returned a duplicate — drift in TurnAction.swift")
+    }
+
+    func testNotYetImplementedThrownForCrossPodCases() async throws {
+        // Arch's redirect: cross-pod InverseAction cases throw
+        // `notYetImplemented` (not silent backendFailure). Track C swaps the
+        // throw for a real handler in their commit. The test asserts the
+        // typed error so a future refactor can't accidentally degrade these
+        // to a generic backendFailure.
+        let executor = UndoExecutor()
+        let crossPodCases: [(InverseAction, InverseActionKind)] = [
+            (.revertInstrumentEvent(instrumentID: "i", eventIDToReverse: EventID.generate()), .revertInstrumentEvent),
+            (.archiveDomain(domain: "d", archivedAt: Date()), .archiveDomain),
+            (.unarchiveDomain(domain: "d"), .unarchiveDomain),
+            (.forgetMemory(memoryID: MemoryID(rawValue: "m")), .forgetMemory),
+            (.unforgetMemory(memoryID: MemoryID(rawValue: "m")), .unforgetMemory)
+        ]
+        for (action, expectedKind) in crossPodCases {
+            do {
+                try await executor.execute(action)
+                XCTFail("expected notYetImplemented for \(expectedKind.rawValue)")
+            } catch let e as UndoExecutorError {
+                guard case .notYetImplemented(let kind) = e else {
+                    XCTFail("expected notYetImplemented, got \(e) for \(expectedKind.rawValue)")
+                    continue
+                }
+                XCTAssertEqual(kind, expectedKind)
+            } catch {
+                XCTFail("unexpected error type for \(expectedKind.rawValue): \(error)")
+            }
+        }
     }
 
     // MARK: - AuditLog

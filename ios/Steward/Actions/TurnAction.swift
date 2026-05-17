@@ -302,9 +302,51 @@ public enum UndoOutcome: Sendable, Equatable {
     case notFound(originalEventID: EventID)
 }
 
+/// Kind tag for `InverseAction`. Used in `UndoExecutorError.notYetImplemented`
+/// so cross-pod cases (memory / domain / instrument event-replay) can throw a
+/// typed "Pod C hasn't wired this yet" error WITHOUT introducing a `default:`
+/// arm in the undo switch (hard reject #4). Adding an InverseAction case must
+/// also add a kind case here — the test in `UndoExecutorTests` asserts parity.
+public enum InverseActionKind: String, Codable, Sendable, CaseIterable {
+    case restoreCalendarEvent
+    case deleteCalendarEvent
+    case modifyCalendarEvent
+    case recreateReminder
+    case deleteReminder
+    case rescheduleNotification
+    case cancelNotification
+    case revertInstrumentEvent
+    case archiveDomain
+    case unarchiveDomain
+    case forgetMemory
+    case unforgetMemory
+}
+
+public extension InverseAction {
+    var kind: InverseActionKind {
+        switch self {
+        case .restoreCalendarEvent:    return .restoreCalendarEvent
+        case .deleteCalendarEvent:     return .deleteCalendarEvent
+        case .modifyCalendarEvent:     return .modifyCalendarEvent
+        case .recreateReminder:        return .recreateReminder
+        case .deleteReminder:          return .deleteReminder
+        case .rescheduleNotification:  return .rescheduleNotification
+        case .cancelNotification:      return .cancelNotification
+        case .revertInstrumentEvent:   return .revertInstrumentEvent
+        case .archiveDomain:           return .archiveDomain
+        case .unarchiveDomain:         return .unarchiveDomain
+        case .forgetMemory:            return .forgetMemory
+        case .unforgetMemory:          return .unforgetMemory
+        }
+    }
+}
+
 public enum UndoExecutorError: Error, CustomStringConvertible, Sendable {
     case eventPayloadMissing(EventID)
     case eventPayloadInvalid(EventID, underlying: Error)
+    case notYetImplemented(InverseActionKind)
+    case ekEventNotFound(ekEventID: String)
+    case ekStoreUnavailable
     case backendFailure(String)
 
     public var description: String {
@@ -313,6 +355,12 @@ public enum UndoExecutorError: Error, CustomStringConvertible, Sendable {
             return "events.payload_json for \(id.rawValue) has no `turn_action` entry."
         case .eventPayloadInvalid(let id, let underlying):
             return "events.payload_json for \(id.rawValue) failed to decode: \(underlying)"
+        case .notYetImplemented(let k):
+            return "Undo handler for \(k.rawValue) is not implemented in v1 — owner pod hasn't landed."
+        case .ekEventNotFound(let id):
+            return "EventKit event \(id) not found — already removed or store revoked."
+        case .ekStoreUnavailable:
+            return "EventKit store unavailable; permission may have been revoked."
         case .backendFailure(let msg):
             return "Undo backend failure: \(msg)"
         }
