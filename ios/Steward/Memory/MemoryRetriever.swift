@@ -83,7 +83,7 @@ enum MemoryRetriever {
         let scoredHits: [MemoryHit] = try await queue.read { db in
             let lexical = try ftsSearch(query: query, domain: domain, types: types, in: db)
 
-            let semanticIds: [MemoryId] = try semanticPrefilter(
+            let semanticIDs: [MemoryID] = try semanticPrefilter(
                 queryVec: queryVec,
                 domain: domain,
                 types: types,
@@ -92,12 +92,12 @@ enum MemoryRetriever {
             )
 
             // 4. Union of candidate Ids (de-duped).
-            var candidateIds = Set<MemoryId>(lexical.keys)
-            for id in semanticIds { candidateIds.insert(id) }
-            if candidateIds.isEmpty { return [] }
+            var candidateIDs = Set<MemoryID>(lexical.keys)
+            for id in semanticIDs { candidateIDs.insert(id) }
+            if candidateIDs.isEmpty { return [] }
 
             // 5. Load rows + rerank.
-            let items = try MemoryItem.fetchMany(db: db, memoryIds: Array(candidateIds))
+            let items = try MemoryItem.fetchMany(db: db, memoryIDs: Array(candidateIDs))
             let maxBM25 = lexical.values.max() ?? 0
 
             var hits: [MemoryHit] = []
@@ -110,7 +110,7 @@ enum MemoryRetriever {
                 } else {
                     cos = 0
                 }
-                let bm25Raw = lexical[item.memoryId] ?? 0
+                let bm25Raw = lexical[item.memoryID] ?? 0
                 let bm25Norm = maxBM25 > 0 ? (bm25Raw / maxBM25) : 0
                 let recency = recencyScore(item.lastAccessedAt ?? item.createdAt, now: now)
                 let typeBonus = item.type.rerankerBonus
@@ -140,7 +140,7 @@ enum MemoryRetriever {
         if recordRetrievalBoost, !scoredHits.isEmpty {
             _ = try await queue.write { writeDB in
                 for h in scoredHits {
-                    try MemoryItem.recordRetrieval(memoryId: h.item.memoryId, now: now, in: writeDB)
+                    try MemoryItem.recordRetrieval(memoryID: h.item.memoryID, now: now, in: writeDB)
                 }
             }
         }
@@ -218,7 +218,7 @@ enum MemoryRetriever {
         types: [MemoryType]?,
         topK: Int,
         in db: Database
-    ) throws -> [MemoryId] {
+    ) throws -> [MemoryID] {
         guard let q = queryVec else { return [] }
         var sql = """
             SELECT memory_id, embedding
@@ -236,7 +236,7 @@ enum MemoryRetriever {
             for t in types { args.append(t.rawValue) }
         }
         let rows = try Row.fetchAll(db, sql: sql, arguments: StatementArguments(args))
-        var scored: [(MemoryId, Float)] = []
+        var scored: [(MemoryID, Float)] = []
         scored.reserveCapacity(rows.count)
         for row in rows {
             let blob: Data = row["embedding"]

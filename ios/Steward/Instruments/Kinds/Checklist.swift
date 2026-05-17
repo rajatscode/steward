@@ -32,13 +32,24 @@ enum Checklist: InstrumentKind {
         var streakByItem: [String: Int]
         /// Calendar-day anchor; we reset `checkedToday` to [] on day rollover.
         var lastResetAt: Date
+
+        enum CodingKeys: String, CodingKey {
+            case checkedToday = "checked_today"
+            case streakByItem = "streak_by_item"
+            case lastResetAt = "last_reset_at"
+        }
     }
 
     // MARK: - EventPayload
 
     struct EventPayload: Codable, Sendable, Equatable {
-        let itemId: String
+        let itemID: String
         let checked: Bool
+
+        enum CodingKeys: String, CodingKey {
+            case itemID = "item_id"
+            case checked
+        }
     }
 
     // MARK: - InstrumentKind
@@ -63,9 +74,9 @@ enum Checklist: InstrumentKind {
         definition: Definition,
         now: Date
     ) throws -> State {
-        guard definition.items.contains(where: { $0.id == event.payload.itemId }) else {
+        guard definition.items.contains(where: { $0.id == event.payload.itemID }) else {
             throw InstrumentKindError.invalidEventPayload(
-                reason: "Checklist event references unknown itemId '\(event.payload.itemId)'"
+                reason: "Checklist event references unknown itemID '\(event.payload.itemID)'"
             )
         }
 
@@ -102,11 +113,11 @@ enum Checklist: InstrumentKind {
         // Apply the check/uncheck.
         var checked = working.checkedToday
         if event.payload.checked {
-            if !checked.contains(event.payload.itemId) {
-                checked.append(event.payload.itemId)
+            if !checked.contains(event.payload.itemID) {
+                checked.append(event.payload.itemID)
             }
         } else {
-            checked.removeAll { $0 == event.payload.itemId }
+            checked.removeAll { $0 == event.payload.itemID }
         }
 
         return State(
@@ -121,12 +132,12 @@ enum Checklist: InstrumentKind {
         to state: State,
         definition: Definition
     ) throws -> State {
-        // CSV cell is "checked" (true/false) for a given item row. rowId is
+        // CSV cell is "checked" (true/false) for a given item row. rowID is
         // the item Id. newValue is "true"/"false" (case-insensitive).
-        guard let itemId = correction.rowId,
-              definition.items.contains(where: { $0.id == itemId }) else {
+        guard let itemID = correction.rowID,
+              definition.items.contains(where: { $0.id == itemID }) else {
             throw InstrumentKindError.unparseableCSV(
-                reason: "Checklist correction rowId must be a known item Id, got \(correction.rowId ?? "nil")"
+                reason: "Checklist correction rowID must be a known item Id, got \(correction.rowID ?? "nil")"
             )
         }
         guard let raw = correction.newValue?.lowercased() else {
@@ -148,9 +159,9 @@ enum Checklist: InstrumentKind {
         }
         var checked = state.checkedToday
         if shouldCheck {
-            if !checked.contains(itemId) { checked.append(itemId) }
+            if !checked.contains(itemID) { checked.append(itemID) }
         } else {
-            checked.removeAll { $0 == itemId }
+            checked.removeAll { $0 == itemID }
         }
         return State(
             checkedToday: checked,

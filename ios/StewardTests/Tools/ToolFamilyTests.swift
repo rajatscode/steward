@@ -46,12 +46,12 @@ final class ToolFamilyTests: XCTestCase {
         """
         let resultJSON = try await tool.invoke(argsJSON: args)
         let result = try ToolJSON.decode(EventCaptureResult.self, from: resultJSON)
-        XCTAssertFalse(result.eventId.isEmpty)
+        XCTAssertFalse(result.eventID.isEmpty)
 
         let db = try await provider.database()
         let row = try await db.read { db -> Row? in
             try Row.fetchOne(db, sql: "SELECT actor, reasoning FROM events WHERE event_id = ?",
-                             arguments: [result.eventId])
+                             arguments: [result.eventID])
         }
         XCTAssertEqual(row?["actor"] as String?, "agent:health")
         XCTAssertNotNil(row?["reasoning"] as String?)
@@ -104,7 +104,7 @@ final class ToolFamilyTests: XCTestCase {
         let payloadJSON = #"{"value":40,"notes":"lunch"}"#
         let applyArgs = """
         {
-          "instrument_id": "\(createResult.instrumentId)",
+          "instrument_id": "\(createResult.instrumentID)",
           "event_kind": "spend",
           "payload_json": \(payloadJSON.toJSONString()),
           "notes": "lunch",
@@ -115,12 +115,12 @@ final class ToolFamilyTests: XCTestCase {
         _ = try await applyTool.invoke(argsJSON: applyArgs)
 
         let readResultJSON = try await readTool.invoke(
-            argsJSON: #"{"instrument_id":"\#(createResult.instrumentId)"}"#
+            argsJSON: #"{"instrument_id":"\#(createResult.instrumentID)"}"#
         )
         let readResult = try ToolJSON.decode(InstrumentReadResult.self, from: readResultJSON)
         let dec = JSONDecoder()
         dec.dateDecodingStrategy = .iso8601
-        let state = try dec.decode(BoundedBudget.State.self, from: readResult.stateJson.data(using: .utf8)!)
+        let state = try dec.decode(BoundedBudget.State.self, from: readResult.stateJSON.data(using: .utf8)!)
         XCTAssertEqual(state.periodTotal, 40)
         XCTAssertEqual(state.remaining, 60)
     }
@@ -143,12 +143,12 @@ final class ToolFamilyTests: XCTestCase {
         """
         let cResultJSON = try await create.invoke(argsJSON: createArgs)
         let cResult = try ToolJSON.decode(CommitmentCreateResult.self, from: cResultJSON)
-        XCTAssertFalse(cResult.commitmentId.isEmpty)
+        XCTAssertFalse(cResult.commitmentID.isEmpty)
 
         let complete = CommitmentCompleteTool(provider: provider, now: { self.fixedNow })
         let doneArgs = """
         {
-          "commitment_id": "\(cResult.commitmentId)",
+          "commitment_id": "\(cResult.commitmentID)",
           "notes": "scheduled for next Tuesday",
           "reasoning": "user reported done",
           "actor": "agent:health"

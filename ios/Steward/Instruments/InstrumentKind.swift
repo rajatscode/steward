@@ -18,21 +18,21 @@ import Foundation
 
 /// String-typed Ids. The DB stores them as TEXT; ULIDs are produced via
 /// `ULID.generate()` so cross-table foreign keys collate by insertion order.
-typealias InstrumentId = String
-typealias EventId      = String
-typealias MemoryId     = String
-typealias CommitmentId = String
-typealias NotificationId = String
+typealias InstrumentID = String
+typealias EventID      = String
+typealias MemoryID     = String
+typealias CommitmentID = String
+typealias NotificationID = String
 
 // MARK: - Shared shapes
 
 /// One row passed into an instrument updater. `T` is the kind-specific
 /// payload (Codable, kind-defined). The wrapping envelope is uniform so
-/// the registry can stamp `eventId` / `createdAt` / `actor` before the kind
+/// the registry can stamp `eventID` / `createdAt` / `actor` before the kind
 /// ever sees the payload.
 struct InstrumentEvent<Payload: Codable & Sendable>: Codable, Sendable {
-    let eventId: EventId
-    let instrumentId: InstrumentId
+    let eventID: EventID
+    let instrumentID: InstrumentID
     let kind: String          // event sub-kind (e.g. "spend", "log", "increment")
     let actor: String         // "user" | "system" | "agent:<domain>" | "coordinator"
     let createdAt: Date
@@ -44,13 +44,23 @@ struct InstrumentEvent<Payload: Codable & Sendable>: Codable, Sendable {
 /// Produced by Pod F's CSV reconciliation when the user hand-edits the
 /// instrument's CSV mirror. Each kind decides how to fold it into State.
 struct ManualCorrection: Codable, Sendable {
-    let correctionId: String
-    let rowId: String?        // CSV __row_id if the correction targets a specific row
+    let correctionID: String
+    let rowID: String?        // CSV __row_id if the correction targets a specific row
     let cell: String?         // column name being corrected
     let oldValue: String?     // stringified for audit; kind parses to its own type
     let newValue: String?
     let appliedAt: Date
     let reason: String
+
+    enum CodingKeys: String, CodingKey {
+        case correctionID = "correction_id"
+        case rowID = "row_id"
+        case cell
+        case oldValue = "old_value"
+        case newValue = "new_value"
+        case appliedAt = "applied_at"
+        case reason
+    }
 }
 
 /// Render target for `renderCSV`. Plain rows + a header. Pod F serializes

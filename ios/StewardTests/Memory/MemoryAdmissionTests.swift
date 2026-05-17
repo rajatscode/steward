@@ -37,7 +37,7 @@ final class MemoryAdmissionTests: XCTestCase {
     ) -> MemoryItem {
         let now = Date()
         return MemoryItem(
-            memoryId: id,
+            memoryID: id,
             type: type,
             text: text,
             embedding: normalize(embedding),
@@ -49,7 +49,7 @@ final class MemoryAdmissionTests: XCTestCase {
             createdAt: now,
             expiresAt: nil,
             domain: domain,
-            provenanceEventIds: []
+            provenanceEventIDs: []
         )
     }
 
@@ -61,7 +61,7 @@ final class MemoryAdmissionTests: XCTestCase {
             domain: nil,
             strength: 1.0,
             expiresAt: nil,
-            provenanceEventIds: []
+            provenanceEventIDs: []
         )
         let result = try q.read { db in
             try MemoryAdmissionPolicy.evaluate(prop, embedding: [0.6, 0.8], turnSaveCount: 0, now: Date(), in: db)
@@ -72,7 +72,7 @@ final class MemoryAdmissionTests: XCTestCase {
     func test_admission_perTurnCap_rejectsAtThree() throws {
         let q = try makeDB()
         let prop = MemorySaveProposal(
-            type: .observation, text: "x", domain: nil, strength: 1.0, expiresAt: nil, provenanceEventIds: []
+            type: .observation, text: "x", domain: nil, strength: 1.0, expiresAt: nil, provenanceEventIDs: []
         )
         let result = try q.read { db in
             try MemoryAdmissionPolicy.evaluate(prop, embedding: [0.6, 0.8], turnSaveCount: 3, now: Date(), in: db)
@@ -88,13 +88,13 @@ final class MemoryAdmissionTests: XCTestCase {
 
         let prop = MemorySaveProposal(
             type: .preference, text: "no morning prompts", domain: nil,
-            strength: 1.0, expiresAt: nil, provenanceEventIds: []
+            strength: 1.0, expiresAt: nil, provenanceEventIDs: []
         )
         let result = try q.read { db in
             try MemoryAdmissionPolicy.evaluate(prop, embedding: normalize(identical), turnSaveCount: 0, now: Date(), in: db)
         }
-        if case .rejectDuplicate(let existingId, let cosine) = result {
-            XCTAssertEqual(existingId, "m1")
+        if case .rejectDuplicate(let existingID, let cosine) = result {
+            XCTAssertEqual(existingID, "m1")
             XCTAssertGreaterThan(cosine, 0.94)
         } else {
             XCTFail("expected rejectDuplicate, got \(result)")
@@ -112,7 +112,7 @@ final class MemoryAdmissionTests: XCTestCase {
         try q.write { db in try existing.upsert(in: db) }
         let prop = MemorySaveProposal(
             type: .preference, text: "fresh", domain: nil,
-            strength: 1.0, expiresAt: nil, provenanceEventIds: []
+            strength: 1.0, expiresAt: nil, provenanceEventIDs: []
         )
         let result = try q.read { db in
             try MemoryAdmissionPolicy.evaluate(prop, embedding: b, turnSaveCount: 0, now: Date(), in: db)
@@ -128,7 +128,7 @@ final class MemoryAdmissionTests: XCTestCase {
         let q = try makeDB()
         let prop = MemorySaveProposal(
             type: .observation, text: "i'm hungry right now",
-            domain: nil, strength: 1.0, expiresAt: nil, provenanceEventIds: []
+            domain: nil, strength: 1.0, expiresAt: nil, provenanceEventIDs: []
         )
         let result = try q.read { db in
             try MemoryAdmissionPolicy.evaluate(prop, embedding: [1, 0], turnSaveCount: 0, now: Date(), in: db)

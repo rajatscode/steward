@@ -23,7 +23,7 @@ import GRDB
 /// rather than kind-specific math problems.
 enum InstrumentRegistryError: Error, CustomStringConvertible, Equatable {
     case unknownKind(String)
-    case instrumentNotFound(InstrumentId)
+    case instrumentNotFound(InstrumentID)
     case definitionDecodeFailed(reason: String)
     case stateDecodeFailed(reason: String)
     case eventDecodeFailed(reason: String)
@@ -44,9 +44,9 @@ enum InstrumentRegistryError: Error, CustomStringConvertible, Equatable {
 /// Persisted shape of an instrument row, lifted into Swift after dispatch.
 /// Returned by `dispatchApply` so callers don't need to re-fetch.
 struct InstrumentRow: Equatable, Sendable {
-    let instrumentId: InstrumentId
+    let instrumentID: InstrumentID
     let domain: String
-    let kindId: String
+    let kindID: String
     let name: String
     let definitionJSON: String
     let stateJSON: String
@@ -108,19 +108,19 @@ enum InstrumentRegistry {
         entries[K.id] = entry
     }
 
-    /// Returns the registered state version for `kindId`. nil if not registered.
+    /// Returns the registered state version for `kindID`. nil if not registered.
     /// Used by the migrator to decide whether to invoke `migrate()`.
-    static func currentStateVersion(forKind kindId: String) -> Int? {
+    static func currentStateVersion(forKind kindID: String) -> Int? {
         lock.lock()
         defer { lock.unlock() }
-        return entries[kindId]?.stateVersion
+        return entries[kindID]?.stateVersion
     }
 
     /// True iff a kind with that Id has been registered.
-    static func isRegistered(_ kindId: String) -> Bool {
+    static func isRegistered(_ kindID: String) -> Bool {
         lock.lock()
         defer { lock.unlock() }
-        return entries[kindId] != nil
+        return entries[kindID] != nil
     }
 
     /// Test seam: clear all registrations. DEBUG-only so production cannot
@@ -149,7 +149,7 @@ enum InstrumentRegistry {
 
     // MARK: - Dispatch
 
-    /// Apply an event to the instrument identified by `instrumentId`.
+    /// Apply an event to the instrument identified by `instrumentID`.
     /// All work happens inside the caller's `db.write { }` block so the
     /// event insert + state update + sync_queue enqueue are atomic
     /// (researcher landmine: storage / GRDB).
@@ -159,15 +159,15 @@ enum InstrumentRegistry {
     /// registry decodes `payload` against the kind's associated type.
     @discardableResult
     static func dispatchApply(
-        instrumentId: InstrumentId,
+        instrumentID: InstrumentID,
         eventJSON: String,
         in db: Database,
         now: Date
     ) throws -> InstrumentRow {
-        let row = try loadRow(instrumentId: instrumentId, db: db)
+        let row = try loadRow(instrumentID: instrumentID, db: db)
 
-        guard let entry = lookup(row.kindId) else {
-            throw InstrumentRegistryError.unknownKind(row.kindId)
+        guard let entry = lookup(row.kindID) else {
+            throw InstrumentRegistryError.unknownKind(row.kindID)
         }
 
         // Forward-migrate stored state if needed BEFORE applying the event.
@@ -197,13 +197,13 @@ enum InstrumentRegistry {
                 SET state_json = ?, state_version = ?, last_updated_at = ?
                 WHERE instrument_id = ?
             """,
-            arguments: [newStateJSON, workingVersion, updatedAt, instrumentId]
+            arguments: [newStateJSON, workingVersion, updatedAt, instrumentID]
         )
 
         return InstrumentRow(
-            instrumentId: row.instrumentId,
+            instrumentID: row.instrumentID,
             domain: row.domain,
-            kindId: row.kindId,
+            kindID: row.kindID,
             name: row.name,
             definitionJSON: row.definitionJSON,
             stateJSON: newStateJSON,
@@ -219,12 +219,12 @@ enum InstrumentRegistry {
     /// Build the initial state JSON for a new instrument. Used by the
     /// `instrument.create` tool before INSERTing the row.
     static func initialStateJSON(
-        forKind kindId: String,
+        forKind kindID: String,
         definitionJSON: String,
         now: Date
     ) throws -> String {
-        guard let entry = lookup(kindId) else {
-            throw InstrumentRegistryError.unknownKind(kindId)
+        guard let entry = lookup(kindID) else {
+            throw InstrumentRegistryError.unknownKind(kindID)
         }
         return try entry.initialStateJSON(definitionJSON, now)
     }
@@ -233,26 +233,26 @@ enum InstrumentRegistry {
     /// Returns the updated state JSON; caller persists + writes the
     /// `manual_correction` event.
     static func applyCorrection(
-        kindId: String,
+        kindID: String,
         correction: ManualCorrection,
         stateJSON: String,
         definitionJSON: String
     ) throws -> String {
-        guard let entry = lookup(kindId) else {
-            throw InstrumentRegistryError.unknownKind(kindId)
+        guard let entry = lookup(kindID) else {
+            throw InstrumentRegistryError.unknownKind(kindID)
         }
         return try entry.applyCorrectionJSON(correction, stateJSON, definitionJSON)
     }
 
     // MARK: - Internals
 
-    private static func lookup(_ kindId: String) -> Entry? {
+    private static func lookup(_ kindID: String) -> Entry? {
         lock.lock()
         defer { lock.unlock() }
-        return entries[kindId]
+        return entries[kindID]
     }
 
-    private static func loadRow(instrumentId: InstrumentId, db: Database) throws -> InstrumentRow {
+    private static func loadRow(instrumentID: InstrumentID, db: Database) throws -> InstrumentRow {
         guard let row = try Row.fetchOne(
             db,
             sql: """
@@ -262,9 +262,9 @@ enum InstrumentRegistry {
                 FROM instruments
                 WHERE instrument_id = ?
             """,
-            arguments: [instrumentId]
+            arguments: [instrumentID]
         ) else {
-            throw InstrumentRegistryError.instrumentNotFound(instrumentId)
+            throw InstrumentRegistryError.instrumentNotFound(instrumentID)
         }
 
         let created = Date(timeIntervalSince1970: Double(row["created_at"] as Int64) / 1000)
@@ -274,9 +274,9 @@ enum InstrumentRegistry {
         }
 
         return InstrumentRow(
-            instrumentId: row["instrument_id"],
+            instrumentID: row["instrument_id"],
             domain: row["domain"],
-            kindId: row["kind"],
+            kindID: row["kind"],
             name: row["name"],
             definitionJSON: row["definition_json"],
             stateJSON: row["state_json"],

@@ -19,19 +19,34 @@ struct DomainCreateArgs: Codable, Equatable, Sendable {
     let rolePrompt: String
     /// Optional tool_scope override; defaults to `ToolScope.domain(domain)`
     /// (the typed convenience the agent loop will load).
-    let toolScopeJson: String?
+    let toolScopeJSON: String?
     let defaultQuietHours: String?
     let reasoning: String
     let actor: String
+
+    enum CodingKeys: String, CodingKey {
+        case domain
+        case displayName = "display_name"
+        case rolePrompt = "role_prompt"
+        case toolScopeJSON = "tool_scope_json"
+        case defaultQuietHours = "default_quiet_hours"
+        case reasoning
+        case actor
+    }
 }
 
 struct DomainCreateResult: Codable, Equatable, Sendable {
     let domain: String
     let createdAt: Date
+
+    enum CodingKeys: String, CodingKey {
+        case domain
+        case createdAt = "created_at"
+    }
 }
 
 struct DomainCreateTool: LLMTool {
-    let id: String = ToolId.domainCreate.rawValue
+    let id: String = ToolID.domainCreate.rawValue
     let description: String = "Spawn a new life-team domain. Persists role_prompt + default tool scope."
     let jsonSchemaForArgs: String = """
     {
@@ -63,7 +78,7 @@ struct DomainCreateTool: LLMTool {
         let timestamp = now()
         let nowMs = Int64(timestamp.timeIntervalSince1970 * 1000)
         let toolScopeJSON: String
-        if let s = args.toolScopeJson {
+        if let s = args.toolScopeJSON {
             toolScopeJSON = s
         } else {
             // Serialize the convenience default. We don't need to roundtrip
@@ -121,6 +136,10 @@ struct DomainCreateTool: LLMTool {
 
 struct DomainListArgs: Codable, Equatable, Sendable {
     let includeArchived: Bool?
+
+    enum CodingKeys: String, CodingKey {
+        case includeArchived = "include_archived"
+    }
 }
 
 struct DomainListItem: Codable, Equatable, Sendable {
@@ -129,6 +148,14 @@ struct DomainListItem: Codable, Equatable, Sendable {
     let rolePrompt: String
     let createdAt: Date
     let archived: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case domain
+        case displayName = "display_name"
+        case rolePrompt = "role_prompt"
+        case createdAt = "created_at"
+        case archived
+    }
 }
 
 struct DomainListResult: Codable, Equatable, Sendable {
@@ -136,7 +163,7 @@ struct DomainListResult: Codable, Equatable, Sendable {
 }
 
 struct DomainListTool: LLMTool {
-    let id: String = ToolId.domainList.rawValue
+    let id: String = ToolID.domainList.rawValue
     let description: String = "List domains (life teams). Archived hidden by default."
     let jsonSchemaForArgs: String = """
     {
@@ -185,15 +212,27 @@ struct DomainUpdatePromptArgs: Codable, Equatable, Sendable {
     let newRolePrompt: String
     let reasoning: String
     let actor: String
+
+    enum CodingKeys: String, CodingKey {
+        case domain
+        case newRolePrompt = "new_role_prompt"
+        case reasoning
+        case actor
+    }
 }
 
 struct DomainUpdatePromptResult: Codable, Equatable, Sendable {
     let domain: String
     let updatedAt: Date
+
+    enum CodingKeys: String, CodingKey {
+        case domain
+        case updatedAt = "updated_at"
+    }
 }
 
 struct DomainUpdatePromptTool: LLMTool {
-    let id: String = ToolId.domainUpdatePrompt.rawValue
+    let id: String = ToolID.domainUpdatePrompt.rawValue
     let description: String = "Replace a domain's role_prompt. Used when user says 'health agent, never moralize'."
     let jsonSchemaForArgs: String = """
     {
@@ -253,10 +292,15 @@ struct DomainArchiveArgs: Codable, Equatable, Sendable {
 struct DomainArchiveResult: Codable, Equatable, Sendable {
     let domain: String
     let archivedAt: Date
+
+    enum CodingKeys: String, CodingKey {
+        case domain
+        case archivedAt = "archived_at"
+    }
 }
 
 struct DomainArchiveTool: LLMTool {
-    let id: String = ToolId.domainArchive.rawValue
+    let id: String = ToolID.domainArchive.rawValue
     let description: String = "Archive a domain. Reversible via undo."
     let jsonSchemaForArgs: String = """
     {

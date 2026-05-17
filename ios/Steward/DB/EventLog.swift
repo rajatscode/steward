@@ -56,13 +56,13 @@ enum EventLogError: Error, CustomStringConvertible, Equatable {
 }
 
 struct EventRecord: Equatable, Sendable {
-    let eventId: EventId
+    let eventID: EventID
     let createdAt: Date
     let actor: EventActor
     let kind: String
     let domain: String?
-    let instrumentId: InstrumentId?
-    let commitmentId: CommitmentId?
+    let instrumentID: InstrumentID?
+    let commitmentID: CommitmentID?
     let text: String?
     let payloadJSON: String?
     let source: String?
@@ -80,15 +80,15 @@ enum EventLog {
         kind: String,
         text: String? = nil,
         domain: String? = nil,
-        instrumentId: InstrumentId? = nil,
-        commitmentId: CommitmentId? = nil,
+        instrumentID: InstrumentID? = nil,
+        commitmentID: CommitmentID? = nil,
         payloadJSON: String? = nil,
         source: String? = nil,
         reasoning: String? = nil,
         at now: Date = Date(),
-        eventId: EventId = ULID.generate(),
+        eventID: EventID = ULID.generate(),
         in db: Database
-    ) throws -> EventId {
+    ) throws -> EventID {
         if actor.requiresReasoning, (reasoning ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             throw EventLogError.reasoningRequired(actor: actor.sqlValue)
         }
@@ -101,20 +101,20 @@ enum EventLog {
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             arguments: [
-                eventId,
+                eventID,
                 createdMs,
                 actor.sqlValue,
                 kind,
                 domain,
-                instrumentId,
-                commitmentId,
+                instrumentID,
+                commitmentID,
                 text,
                 payloadJSON,
                 source,
                 reasoning
             ]
         )
-        return eventId
+        return eventID
     }
 
     /// Convenience: encode a Codable payload to JSON before insert. Errors
@@ -127,14 +127,14 @@ enum EventLog {
         payload: P,
         text: String? = nil,
         domain: String? = nil,
-        instrumentId: InstrumentId? = nil,
-        commitmentId: CommitmentId? = nil,
+        instrumentID: InstrumentID? = nil,
+        commitmentID: CommitmentID? = nil,
         source: String? = nil,
         reasoning: String? = nil,
         at now: Date = Date(),
-        eventId: EventId = ULID.generate(),
+        eventID: EventID = ULID.generate(),
         in db: Database
-    ) throws -> EventId {
+    ) throws -> EventID {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
         encoder.outputFormatting = [.sortedKeys]
@@ -155,13 +155,13 @@ enum EventLog {
             kind: kind,
             text: text,
             domain: domain,
-            instrumentId: instrumentId,
-            commitmentId: commitmentId,
+            instrumentID: instrumentID,
+            commitmentID: commitmentID,
             payloadJSON: json,
             source: source,
             reasoning: reasoning,
             at: now,
-            eventId: eventId,
+            eventID: eventID,
             in: db
         )
     }

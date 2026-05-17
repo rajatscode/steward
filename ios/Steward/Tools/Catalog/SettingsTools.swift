@@ -15,15 +15,27 @@ struct MercyModeEngageArgs: Codable, Equatable, Sendable {
     let reason: String
     let reasoning: String
     let actor: String
+
+    enum CodingKeys: String, CodingKey {
+        case untilWhen = "until_when"
+        case reason
+        case reasoning
+        case actor
+    }
 }
 
 struct MercyModeEngageResult: Codable, Equatable, Sendable {
     let mercyModeUntil: Date
     let engagedAt: Date
+
+    enum CodingKeys: String, CodingKey {
+        case mercyModeUntil = "mercy_mode_until"
+        case engagedAt = "engaged_at"
+    }
 }
 
 struct MercyModeEngageTool: LLMTool {
-    let id: String = ToolId.mercyModeEngage.rawValue
+    let id: String = ToolID.mercyModeEngage.rawValue
     let description: String = "Engage mercy mode until a date. Softens nudges, prefers smallest re-entry actions."
     let jsonSchemaForArgs: String = """
     {
@@ -88,15 +100,27 @@ struct PauseEngageArgs: Codable, Equatable, Sendable {
     let reason: String
     let reasoning: String
     let actor: String
+
+    enum CodingKeys: String, CodingKey {
+        case untilWhen = "until_when"
+        case reason
+        case reasoning
+        case actor
+    }
 }
 
 struct PauseEngageResult: Codable, Equatable, Sendable {
     let pauseUntil: Date
     let engagedAt: Date
+
+    enum CodingKeys: String, CodingKey {
+        case pauseUntil = "pause_until"
+        case engagedAt = "engaged_at"
+    }
 }
 
 struct PauseEngageTool: LLMTool {
-    let id: String = ToolId.pauseEngage.rawValue
+    let id: String = ToolID.pauseEngage.rawValue
     let description: String = "Pause non-critical notifications until a date."
     let jsonSchemaForArgs: String = """
     {
@@ -166,10 +190,16 @@ struct QuietHoursSetResult: Codable, Equatable, Sendable {
     let start: String
     let end: String
     let updatedAt: Date
+
+    enum CodingKeys: String, CodingKey {
+        case start
+        case end
+        case updatedAt = "updated_at"
+    }
 }
 
 struct QuietHoursSetTool: LLMTool {
-    let id: String = ToolId.quietHoursSet.rawValue
+    let id: String = ToolID.quietHoursSet.rawValue
     let description: String = "Set the user's quiet hours window. Format: HH:mm local."
     let jsonSchemaForArgs: String = """
     {

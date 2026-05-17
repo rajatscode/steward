@@ -27,18 +27,33 @@ struct CommitmentCreateArgs: Codable, Equatable, Sendable {
     let domain: String?
     let dueAt: Date?
     let importance: CommitmentImportance
-    let linkedInstrumentId: InstrumentId?
+    let linkedInstrumentID: InstrumentID?
     let reasoning: String
     let actor: String
+
+    enum CodingKeys: String, CodingKey {
+        case title
+        case domain
+        case dueAt = "due_at"
+        case importance
+        case linkedInstrumentID = "linked_instrument_id"
+        case reasoning
+        case actor
+    }
 }
 
 struct CommitmentCreateResult: Codable, Equatable, Sendable {
-    let commitmentId: CommitmentId
+    let commitmentID: CommitmentID
     let createdAt: Date
+
+    enum CodingKeys: String, CodingKey {
+        case commitmentID = "commitment_id"
+        case createdAt = "created_at"
+    }
 }
 
 struct CommitmentCreateTool: LLMTool {
-    let id: String = ToolId.commitmentCreate.rawValue
+    let id: String = ToolID.commitmentCreate.rawValue
     let description: String = "Create a commitment (a promised action). EventKit mirror is Pod D's job."
     let jsonSchemaForArgs: String = """
     {
@@ -87,7 +102,7 @@ struct CommitmentCreateTool: LLMTool {
                     dueMs,
                     args.domain,
                     args.importance.rawValue,
-                    args.linkedInstrumentId,
+                    args.linkedInstrumentID,
                     nowMs
                 ]
             )
@@ -96,14 +111,14 @@ struct CommitmentCreateTool: LLMTool {
                 kind: "commitment_create",
                 text: args.title,
                 domain: args.domain,
-                commitmentId: id,
+                commitmentID: id,
                 source: "tool",
                 reasoning: args.reasoning,
                 at: timestamp,
                 in: dbase
             )
         }
-        return try ToolJSON.encode(CommitmentCreateResult(commitmentId: id, createdAt: timestamp))
+        return try ToolJSON.encode(CommitmentCreateResult(commitmentID: id, createdAt: timestamp))
     }
 }
 
@@ -115,15 +130,27 @@ struct CommitmentListArgs: Codable, Equatable, Sendable {
 }
 
 struct CommitmentListItem: Codable, Equatable, Sendable {
-    let commitmentId: CommitmentId
+    let commitmentID: CommitmentID
     let title: String
     let status: CommitmentStatus
     let domain: String?
     let dueAt: Date?
     let importance: CommitmentImportance
-    let linkedInstrumentId: InstrumentId?
+    let linkedInstrumentID: InstrumentID?
     let createdAt: Date
     let completedAt: Date?
+
+    enum CodingKeys: String, CodingKey {
+        case commitmentID = "commitment_id"
+        case title
+        case status
+        case domain
+        case dueAt = "due_at"
+        case importance
+        case linkedInstrumentID = "linked_instrument_id"
+        case createdAt = "created_at"
+        case completedAt = "completed_at"
+    }
 }
 
 struct CommitmentListResult: Codable, Equatable, Sendable {
@@ -131,7 +158,7 @@ struct CommitmentListResult: Codable, Equatable, Sendable {
 }
 
 struct CommitmentListTool: LLMTool {
-    let id: String = ToolId.commitmentList.rawValue
+    let id: String = ToolID.commitmentList.rawValue
     let description: String = "List commitments. Filter by status / domain."
     let jsonSchemaForArgs: String = """
     {
@@ -181,13 +208,13 @@ struct CommitmentListTool: LLMTool {
                     )
                 }
                 return CommitmentListItem(
-                    commitmentId: row["commitment_id"],
+                    commitmentID: row["commitment_id"],
                     title: row["title"],
                     status: status,
                     domain: row["domain"],
                     dueAt: (row["due_at"] as Int64?).map { Date(timeIntervalSince1970: Double($0) / 1000) },
                     importance: imp,
-                    linkedInstrumentId: row["linked_instrument_id"],
+                    linkedInstrumentID: row["linked_instrument_id"],
                     createdAt: Date(timeIntervalSince1970: Double(row["created_at"] as Int64) / 1000),
                     completedAt: (row["completed_at"] as Int64?).map { Date(timeIntervalSince1970: Double($0) / 1000) }
                 )
@@ -201,7 +228,7 @@ struct CommitmentListTool: LLMTool {
 
 enum CommitmentTools {
     static func transition(
-        commitmentId: CommitmentId,
+        commitmentID: CommitmentID,
         to status: CommitmentStatus,
         completedAt: Date?,
         in db: Database
@@ -210,12 +237,12 @@ enum CommitmentTools {
         if let completedMs {
             try db.execute(
                 sql: "UPDATE commitments SET status = ?, completed_at = ? WHERE commitment_id = ?",
-                arguments: [status.rawValue, completedMs, commitmentId]
+                arguments: [status.rawValue, completedMs, commitmentID]
             )
         } else {
             try db.execute(
                 sql: "UPDATE commitments SET status = ? WHERE commitment_id = ?",
-                arguments: [status.rawValue, commitmentId]
+                arguments: [status.rawValue, commitmentID]
             )
         }
     }
@@ -224,20 +251,33 @@ enum CommitmentTools {
 // MARK: - commitment.complete
 
 struct CommitmentCompleteArgs: Codable, Equatable, Sendable {
-    let commitmentId: CommitmentId
+    let commitmentID: CommitmentID
     let notes: String?
     let reasoning: String
     let actor: String
+
+    enum CodingKeys: String, CodingKey {
+        case commitmentID = "commitment_id"
+        case notes
+        case reasoning
+        case actor
+    }
 }
 
 struct CommitmentTransitionResult: Codable, Equatable, Sendable {
-    let commitmentId: CommitmentId
+    let commitmentID: CommitmentID
     let status: CommitmentStatus
     let transitionedAt: Date
+
+    enum CodingKeys: String, CodingKey {
+        case commitmentID = "commitment_id"
+        case status
+        case transitionedAt = "transitioned_at"
+    }
 }
 
 struct CommitmentCompleteTool: LLMTool {
-    let id: String = ToolId.commitmentComplete.rawValue
+    let id: String = ToolID.commitmentComplete.rawValue
     let description: String = "Mark a commitment as done."
     let jsonSchemaForArgs: String = """
     {
@@ -267,7 +307,7 @@ struct CommitmentCompleteTool: LLMTool {
         let db = try await provider.database()
         try await db.write { dbase in
             try CommitmentTools.transition(
-                commitmentId: args.commitmentId,
+                commitmentID: args.commitmentID,
                 to: .done,
                 completedAt: timestamp,
                 in: dbase
@@ -276,7 +316,7 @@ struct CommitmentCompleteTool: LLMTool {
                 actor: actor,
                 kind: "commitment_complete",
                 text: args.notes,
-                commitmentId: args.commitmentId,
+                commitmentID: args.commitmentID,
                 source: "tool",
                 reasoning: args.reasoning,
                 at: timestamp,
@@ -284,7 +324,7 @@ struct CommitmentCompleteTool: LLMTool {
             )
         }
         return try ToolJSON.encode(CommitmentTransitionResult(
-            commitmentId: args.commitmentId,
+            commitmentID: args.commitmentID,
             status: .done,
             transitionedAt: timestamp
         ))
@@ -294,14 +334,21 @@ struct CommitmentCompleteTool: LLMTool {
 // MARK: - commitment.abandon
 
 struct CommitmentAbandonArgs: Codable, Equatable, Sendable {
-    let commitmentId: CommitmentId
+    let commitmentID: CommitmentID
     let reason: String
     let reasoning: String
     let actor: String
+
+    enum CodingKeys: String, CodingKey {
+        case commitmentID = "commitment_id"
+        case reason
+        case reasoning
+        case actor
+    }
 }
 
 struct CommitmentAbandonTool: LLMTool {
-    let id: String = ToolId.commitmentAbandon.rawValue
+    let id: String = ToolID.commitmentAbandon.rawValue
     let description: String = "Abandon a commitment (status='abandoned' with logged reason). Not shameful — treated as ordinary."
     let jsonSchemaForArgs: String = """
     {
@@ -331,7 +378,7 @@ struct CommitmentAbandonTool: LLMTool {
         let db = try await provider.database()
         try await db.write { dbase in
             try CommitmentTools.transition(
-                commitmentId: args.commitmentId,
+                commitmentID: args.commitmentID,
                 to: .abandoned,
                 completedAt: nil,
                 in: dbase
@@ -340,7 +387,7 @@ struct CommitmentAbandonTool: LLMTool {
                 actor: actor,
                 kind: "commitment_abandon",
                 text: args.reason,
-                commitmentId: args.commitmentId,
+                commitmentID: args.commitmentID,
                 source: "tool",
                 reasoning: args.reasoning,
                 at: timestamp,
@@ -348,7 +395,7 @@ struct CommitmentAbandonTool: LLMTool {
             )
         }
         return try ToolJSON.encode(CommitmentTransitionResult(
-            commitmentId: args.commitmentId,
+            commitmentID: args.commitmentID,
             status: .abandoned,
             transitionedAt: timestamp
         ))
@@ -358,14 +405,21 @@ struct CommitmentAbandonTool: LLMTool {
 // MARK: - commitment.snooze
 
 struct CommitmentSnoozeArgs: Codable, Equatable, Sendable {
-    let commitmentId: CommitmentId
+    let commitmentID: CommitmentID
     let until: Date
     let reasoning: String
     let actor: String
+
+    enum CodingKeys: String, CodingKey {
+        case commitmentID = "commitment_id"
+        case until
+        case reasoning
+        case actor
+    }
 }
 
 struct CommitmentSnoozeTool: LLMTool {
-    let id: String = ToolId.commitmentSnooze.rawValue
+    let id: String = ToolID.commitmentSnooze.rawValue
     let description: String = "Snooze a commitment to a future date."
     let jsonSchemaForArgs: String = """
     {
@@ -401,13 +455,13 @@ struct CommitmentSnoozeTool: LLMTool {
                     SET status = ?, due_at = ?
                     WHERE commitment_id = ?
                 """,
-                arguments: [CommitmentStatus.snoozed.rawValue, untilMs, args.commitmentId]
+                arguments: [CommitmentStatus.snoozed.rawValue, untilMs, args.commitmentID]
             )
             try EventLog.append(
                 actor: actor,
                 kind: "commitment_snooze",
                 payload: ["until": ISO8601DateFormatter().string(from: args.until)],
-                commitmentId: args.commitmentId,
+                commitmentID: args.commitmentID,
                 source: "tool",
                 reasoning: args.reasoning,
                 at: timestamp,
@@ -415,7 +469,7 @@ struct CommitmentSnoozeTool: LLMTool {
             )
         }
         return try ToolJSON.encode(CommitmentTransitionResult(
-            commitmentId: args.commitmentId,
+            commitmentID: args.commitmentID,
             status: .snoozed,
             transitionedAt: timestamp
         ))

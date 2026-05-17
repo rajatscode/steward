@@ -29,7 +29,7 @@ struct AgentHandoffPlaceholderResult: Codable, Equatable, Sendable {
 }
 
 struct AgentHandoffTool: LLMTool {
-    let id: String = ToolId.agentHandoff.rawValue
+    let id: String = ToolID.agentHandoff.rawValue
     let description: String = "Coordinator-only: delegate the current turn to a named domain agent. The agent loop owns dispatch."
     let jsonSchemaForArgs: String = """
     {
@@ -65,7 +65,7 @@ struct AgentCrossConsultArgs: Codable, Equatable, Sendable {
 }
 
 struct AgentCrossConsultTool: LLMTool {
-    let id: String = ToolId.agentCrossConsult.rawValue
+    let id: String = ToolID.agentCrossConsult.rawValue
     let description: String = "Coordinator-only: ask a domain agent a question without full handoff."
     let jsonSchemaForArgs: String = """
     {

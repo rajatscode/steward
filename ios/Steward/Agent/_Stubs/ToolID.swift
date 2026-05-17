@@ -1,5 +1,5 @@
 //
-//  ToolId.swift  (Track C stub — Agent/_Stubs/)
+//  ToolID.swift  (Track C stub — Agent/_Stubs/)
 //
 //  DELETE AT MERGE — Pod B owns canonical per addendum §1.8.
 //  Cases must match Pod B's `Agent/ToolID.swift` exactly. Adding a new
@@ -8,13 +8,13 @@
 //
 //  Addendum §1.8: typed identifier for every tool the agent can call. The
 //  enum is the only place tool Ids are spelled out; the catalog's `register`
-//  path takes a `ToolId` (not a String), so adding a tool requires adding
+//  path takes a `ToolID` (not a String), so adding a tool requires adding
 //  a case here first.
 //
 
 import Foundation
 
-enum ToolId: String, Codable, CaseIterable, Sendable {
+enum ToolID: String, Codable, CaseIterable, Sendable {
     // Capture
     case eventCapture          = "event.capture"
     case eventList             = "event.list"

@@ -59,12 +59,12 @@ struct ArgConstraints: Codable, Equatable, Sendable {
 }
 
 struct ToolScope: Codable, Equatable, Sendable {
-    var allowedTools: Set<ToolId>
-    var argConstraints: [ToolId: ArgConstraints]
+    var allowedTools: Set<ToolID>
+    var argConstraints: [ToolID: ArgConstraints]
 
     /// Convenience: full surface, no constraints. Coordinator scope.
     static let coordinator: ToolScope = ToolScope(
-        allowedTools: Set(ToolId.allCases),
+        allowedTools: Set(ToolID.allCases),
         argConstraints: [:]
     )
 
@@ -72,7 +72,7 @@ struct ToolScope: Codable, Equatable, Sendable {
     /// tool that takes a `domain` argument. Subset chosen per spec §7
     /// (domain agents own their instruments + commitments + memory).
     static func domain(_ domain: String) -> ToolScope {
-        let allowed: Set<ToolId> = [
+        let allowed: Set<ToolID> = [
             .eventCapture, .eventList, .eventRecentSummary,
             .instrumentCreate, .instrumentList, .instrumentRead,
             .instrumentApplyEvent, .instrumentUpdateDefinition, .instrumentArchive,
@@ -85,7 +85,7 @@ struct ToolScope: Codable, Equatable, Sendable {
             fixedArgs: ["domain": .string(domain)],
             allowedValues: [:]
         )
-        var constraints: [ToolId: ArgConstraints] = [:]
+        var constraints: [ToolID: ArgConstraints] = [:]
         for t in allowed where toolTakesDomainArg(t) {
             constraints[t] = pinDomain
         }
@@ -93,9 +93,9 @@ struct ToolScope: Codable, Equatable, Sendable {
     }
 
     /// Per-tool flag: does the args object have a `domain` field? Exhaustive
-    /// switch — adding a new ToolId case = compile error here until the
+    /// switch — adding a new ToolID case = compile error here until the
     /// flag is filled in. (Arch's strict-switch rule, broadening §4 #4.)
-    private static func toolTakesDomainArg(_ id: ToolId) -> Bool {
+    private static func toolTakesDomainArg(_ id: ToolID) -> Bool {
         switch id {
         case .eventCapture, .eventList, .eventRecentSummary,
              .instrumentCreate, .instrumentList,

@@ -15,7 +15,7 @@ final class MemoryDecayTests: XCTestCase {
         let created = Date(timeIntervalSince1970: 1_700_000_000)
         let later = created.addingTimeInterval(86_400 * 30) // 30 days
         let item = MemoryItem(
-            memoryId: "m1",
+            memoryID: "m1",
             type: .constraint,
             text: "no peanuts",
             embedding: Array(repeating: 0.1, count: 8),
@@ -27,7 +27,7 @@ final class MemoryDecayTests: XCTestCase {
             createdAt: created,
             expiresAt: nil,
             domain: nil,
-            provenanceEventIds: []
+            provenanceEventIDs: []
         )
         let s = item.effectiveStrength(now: later)
         // 0.9995^30 ≈ 0.9851
@@ -38,7 +38,7 @@ final class MemoryDecayTests: XCTestCase {
         let created = Date(timeIntervalSince1970: 1_700_000_000)
         let later = created.addingTimeInterval(86_400 * 30)
         let item = MemoryItem(
-            memoryId: "m2",
+            memoryID: "m2",
             type: .observation,
             text: "noticed user is tired on Mondays",
             embedding: Array(repeating: 0.1, count: 8),
@@ -50,7 +50,7 @@ final class MemoryDecayTests: XCTestCase {
             createdAt: created,
             expiresAt: nil,
             domain: nil,
-            provenanceEventIds: []
+            provenanceEventIDs: []
         )
         let s = item.effectiveStrength(now: later)
         // 0.99^30 ≈ 0.7397
@@ -60,7 +60,7 @@ final class MemoryDecayTests: XCTestCase {
     func test_isExpired_belowThresholdSoftDeleted() {
         let created = Date(timeIntervalSince1970: 1_700_000_000)
         let item = MemoryItem(
-            memoryId: "m3",
+            memoryID: "m3",
             type: .observation,
             text: "old",
             embedding: [0.1],
@@ -72,7 +72,7 @@ final class MemoryDecayTests: XCTestCase {
             createdAt: created,
             expiresAt: nil,
             domain: nil,
-            provenanceEventIds: []
+            provenanceEventIDs: []
         )
         XCTAssertTrue(item.isExpired(now: created))
     }
@@ -89,7 +89,7 @@ final class MemoryDecayTests: XCTestCase {
 
         let veryOld = Date(timeIntervalSince1970: 1_500_000_000)  // years ago
         let item = MemoryItem(
-            memoryId: "m_old",
+            memoryID: "m_old",
             type: .observation,
             text: "ancient observation",
             embedding: Array(repeating: 0.1, count: 4),
@@ -101,7 +101,7 @@ final class MemoryDecayTests: XCTestCase {
             createdAt: veryOld,
             expiresAt: nil,
             domain: nil,
-            provenanceEventIds: []
+            provenanceEventIDs: []
         )
         try q.write { db in try item.upsert(in: db) }
 

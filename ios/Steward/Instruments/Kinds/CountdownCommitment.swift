@@ -24,13 +24,19 @@ enum CountdownCommitment: InstrumentKind {
         /// The agent emits `event_kind = successEventKind` on
         /// `instrument.apply_event` to bump the counter.
         var successEventKind: String
+
+        enum CodingKeys: String, CodingKey {
+            case targetCount = "target_count"
+            case window
+            case successEventKind = "success_event_kind"
+        }
     }
 
     // MARK: - State
 
     struct State: Codable, Sendable, Equatable {
         struct CompletedEvent: Codable, Sendable, Equatable {
-            let eventId: EventId
+            let eventID: EventID
             let at: Date
             let notes: String?
         }
@@ -39,6 +45,14 @@ enum CountdownCommitment: InstrumentKind {
         var windowStart: Date
         var windowEnd: Date
         var completedEvents: [CompletedEvent]
+
+        enum CodingKeys: String, CodingKey {
+            case count
+            case target
+            case windowStart = "window_start"
+            case windowEnd = "window_end"
+            case completedEvents = "completed_events"
+        }
     }
 
     // MARK: - EventPayload
@@ -94,7 +108,7 @@ enum CountdownCommitment: InstrumentKind {
             interval = DateInterval(start: state.windowStart, end: state.windowEnd)
         }
 
-        let entry = State.CompletedEvent(eventId: event.eventId, at: event.createdAt, notes: event.payload.notes)
+        let entry = State.CompletedEvent(eventID: event.eventID, at: event.createdAt, notes: event.payload.notes)
         return State(
             count: working.count + 1,
             target: definition.targetCount,
@@ -136,7 +150,7 @@ enum CountdownCommitment: InstrumentKind {
         let iso = ISO8601DateFormatter()
         let rows: [[String]] = state.completedEvents.map { c in
             [
-                c.eventId,
+                c.eventID,
                 "1",
                 iso.string(from: c.at),
                 iso.string(from: c.at),

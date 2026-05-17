@@ -51,8 +51,8 @@ final class InstrumentRegistryTests: XCTestCase {
         {
           "actor": "agent:money",
           "createdAt": "2026-05-17T12:00:00Z",
-          "eventId": "evt-1",
-          "instrumentId": "i1",
+          "eventID": "evt-1",
+          "instrumentID": "i1",
           "kind": "spend",
           "notes": "lunch",
           "payload": {"value": 40, "notes": "lunch"}
@@ -61,12 +61,12 @@ final class InstrumentRegistryTests: XCTestCase {
 
         try q.write { db in
             let row = try InstrumentRegistry.dispatchApply(
-                instrumentId: "i1",
+                instrumentID: "i1",
                 eventJSON: envelope,
                 in: db,
                 now: ISO8601DateFormatter().date(from: "2026-05-17T12:00:00Z")!
             )
-            XCTAssertEqual(row.kindId, "bounded_budget")
+            XCTAssertEqual(row.kindID, "bounded_budget")
         }
 
         // Verify state_json was updated.
@@ -96,7 +96,7 @@ final class InstrumentRegistryTests: XCTestCase {
         }
         try q.write { db in
             XCTAssertThrowsError(try InstrumentRegistry.dispatchApply(
-                instrumentId: "i2",
+                instrumentID: "i2",
                 eventJSON: "{}",
                 in: db,
                 now: now
@@ -113,7 +113,7 @@ final class InstrumentRegistryTests: XCTestCase {
         let q = try makeTempDB()
         try q.write { db in
             XCTAssertThrowsError(try InstrumentRegistry.dispatchApply(
-                instrumentId: "missing",
+                instrumentID: "missing",
                 eventJSON: "{}",
                 in: db,
                 now: Date()

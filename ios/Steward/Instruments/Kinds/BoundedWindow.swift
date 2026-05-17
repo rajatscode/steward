@@ -27,6 +27,14 @@ enum BoundedWindow: InstrumentKind {
         var complianceMetric: ComplianceMetric
         /// Number of trailing nights used for the rolling compliance %.
         var rollingWindowNights: Int
+
+        enum CodingKeys: String, CodingKey {
+            case kind
+            case startTarget = "start_target"
+            case endTarget = "end_target"
+            case complianceMetric = "compliance_metric"
+            case rollingWindowNights = "rolling_window_nights"
+        }
     }
 
     // MARK: - State
@@ -41,6 +49,11 @@ enum BoundedWindow: InstrumentKind {
         }
         var nightsInWindow: [NightSample]      // trailing rollingWindowNights samples
         var currentCompliancePct: Double        // 0.0 ... 1.0
+
+        enum CodingKeys: String, CodingKey {
+            case nightsInWindow = "nights_in_window"
+            case currentCompliancePct = "current_compliance_pct"
+        }
     }
 
     // MARK: - EventPayload
@@ -48,6 +61,11 @@ enum BoundedWindow: InstrumentKind {
     struct EventPayload: Codable, Sendable, Equatable {
         let actualStart: Date
         let actualEnd: Date
+
+        enum CodingKeys: String, CodingKey {
+            case actualStart = "actual_start"
+            case actualEnd = "actual_end"
+        }
     }
 
     // MARK: - InstrumentKind

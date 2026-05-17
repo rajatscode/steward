@@ -24,6 +24,13 @@ enum RunningAccumulator: InstrumentKind {
         var dailyTarget: Double?
         var weeklyTarget: Double?
         var capturePrompt: String         // user-facing prompt the agent may use
+
+        enum CodingKeys: String, CodingKey {
+            case unit
+            case dailyTarget = "daily_target"
+            case weeklyTarget = "weekly_target"
+            case capturePrompt = "capture_prompt"
+        }
     }
 
     // MARK: - State
@@ -44,6 +51,14 @@ enum RunningAccumulator: InstrumentKind {
         var sevenDayAvg: Double
         var thirtyDayAvg: Double
         var lastEventAt: Date?
+
+        enum CodingKeys: String, CodingKey {
+            case windowEvents = "window_events"
+            case todayTotal = "today_total"
+            case sevenDayAvg = "seven_day_avg"
+            case thirtyDayAvg = "thirty_day_avg"
+            case lastEventAt = "last_event_at"
+        }
     }
 
     // MARK: - EventPayload
@@ -125,7 +140,7 @@ enum RunningAccumulator: InstrumentKind {
         let iso = ISO8601DateFormatter()
         let rows: [[String]] = recentEvents.map { ev in
             [
-                ev.eventId,
+                ev.eventID,
                 "1",
                 iso.string(from: ev.createdAt),
                 iso.string(from: ev.createdAt),

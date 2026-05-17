@@ -20,21 +20,38 @@ struct InstrumentCreateArgs: Codable, Equatable, Sendable {
     /// JSON-encoded definition. Wire format = JSON because the Definition
     /// type is per-kind and the LLM-facing schema can't express a union
     /// cleanly. Decoded by the kind via the registry.
-    let definitionJson: String
+    let definitionJSON: String
     let reviewCadence: String?
     let reasoning: String
     let actor: String
+
+    enum CodingKeys: String, CodingKey {
+        case kind
+        case name
+        case domain
+        case definitionJSON = "definition_json"
+        case reviewCadence = "review_cadence"
+        case reasoning
+        case actor
+    }
 }
 
 struct InstrumentCreateResult: Codable, Equatable, Sendable {
-    let instrumentId: InstrumentId
+    let instrumentID: InstrumentID
     let kind: String
-    let stateJson: String
+    let stateJSON: String
     let stateVersion: Int
+
+    enum CodingKeys: String, CodingKey {
+        case instrumentID = "instrument_id"
+        case kind
+        case stateJSON = "state_json"
+        case stateVersion = "state_version"
+    }
 }
 
 struct InstrumentCreateTool: LLMTool {
-    let id: String = ToolId.instrumentCreate.rawValue
+    let id: String = ToolID.instrumentCreate.rawValue
     let description: String = "Create a new instrument (typed state machine). Supply kind + definition JSON."
     let jsonSchemaForArgs: String = """
     {
@@ -71,12 +88,12 @@ struct InstrumentCreateTool: LLMTool {
         }
         let actor = try EventTools.parseActor(args.actor)
         let timestamp = now()
-        let instrumentId = ULID.generate(now: timestamp)
+        let instrumentID = ULID.generate(now: timestamp)
         let createdMs = Int64(timestamp.timeIntervalSince1970 * 1000)
 
         let initialState = try InstrumentRegistry.initialStateJSON(
             forKind: args.kind,
-            definitionJSON: args.definitionJson,
+            definitionJSON: args.definitionJSON,
             now: timestamp
         )
         let stateVersion = InstrumentRegistry.currentStateVersion(forKind: args.kind) ?? 1
@@ -91,11 +108,11 @@ struct InstrumentCreateTool: LLMTool {
                     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 arguments: [
-                    instrumentId,
+                    instrumentID,
                     args.domain,
                     args.kind,
                     args.name,
-                    args.definitionJson,
+                    args.definitionJSON,
                     initialState,
                     stateVersion,
                     createdMs,
@@ -108,8 +125,8 @@ struct InstrumentCreateTool: LLMTool {
                 kind: "instrument_create",
                 text: args.name,
                 domain: args.domain,
-                instrumentId: instrumentId,
-                payloadJSON: args.definitionJson,
+                instrumentID: instrumentID,
+                payloadJSON: args.definitionJSON,
                 source: "tool",
                 reasoning: args.reasoning,
                 at: timestamp,
@@ -118,9 +135,9 @@ struct InstrumentCreateTool: LLMTool {
         }
 
         return try ToolJSON.encode(InstrumentCreateResult(
-            instrumentId: instrumentId,
+            instrumentID: instrumentID,
             kind: args.kind,
-            stateJson: initialState,
+            stateJSON: initialState,
             stateVersion: stateVersion
         ))
     }
@@ -131,15 +148,29 @@ struct InstrumentCreateTool: LLMTool {
 struct InstrumentListArgs: Codable, Equatable, Sendable {
     let domain: String?
     let includeArchived: Bool?
+
+    enum CodingKeys: String, CodingKey {
+        case domain
+        case includeArchived = "include_archived"
+    }
 }
 
 struct InstrumentListItem: Codable, Equatable, Sendable {
-    let instrumentId: InstrumentId
+    let instrumentID: InstrumentID
     let domain: String
     let kind: String
     let name: String
     let archived: Bool
     let lastUpdatedAt: Date
+
+    enum CodingKeys: String, CodingKey {
+        case instrumentID = "instrument_id"
+        case domain
+        case kind
+        case name
+        case archived
+        case lastUpdatedAt = "last_updated_at"
+    }
 }
 
 struct InstrumentListResult: Codable, Equatable, Sendable {
@@ -147,7 +178,7 @@ struct InstrumentListResult: Codable, Equatable, Sendable {
 }
 
 struct InstrumentListTool: LLMTool {
-    let id: String = ToolId.instrumentList.rawValue
+    let id: String = ToolID.instrumentList.rawValue
     let description: String = "Enumerate instruments. Filter by domain; archived hidden by default."
     let jsonSchemaForArgs: String = """
     {
@@ -184,7 +215,7 @@ struct InstrumentListTool: LLMTool {
             let rows = try Row.fetchAll(dbase, sql: sql, arguments: StatementArguments(sqlArgs))
             return rows.map { row in
                 InstrumentListItem(
-                    instrumentId: row["instrument_id"],
+                    instrumentID: row["instrument_id"],
                     domain: row["domain"],
                     kind: row["kind"],
                     name: row["name"],
@@ -200,23 +231,39 @@ struct InstrumentListTool: LLMTool {
 // MARK: - instrument.read
 
 struct InstrumentReadArgs: Codable, Equatable, Sendable {
-    let instrumentId: InstrumentId
+    let instrumentID: InstrumentID
+
+    enum CodingKeys: String, CodingKey {
+        case instrumentID = "instrument_id"
+    }
 }
 
 struct InstrumentReadResult: Codable, Equatable, Sendable {
-    let instrumentId: InstrumentId
+    let instrumentID: InstrumentID
     let domain: String
     let kind: String
     let name: String
-    let definitionJson: String
-    let stateJson: String
+    let definitionJSON: String
+    let stateJSON: String
     let stateVersion: Int
     let lastUpdatedAt: Date
     let archived: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case instrumentID = "instrument_id"
+        case domain
+        case kind
+        case name
+        case definitionJSON = "definition_json"
+        case stateJSON = "state_json"
+        case stateVersion = "state_version"
+        case lastUpdatedAt = "last_updated_at"
+        case archived
+    }
 }
 
 struct InstrumentReadTool: LLMTool {
-    let id: String = ToolId.instrumentRead.rawValue
+    let id: String = ToolID.instrumentRead.rawValue
     let description: String = "Read instrument's current definition + state. The agent MUST cite these numbers verbatim."
     let jsonSchemaForArgs: String = """
     {
@@ -242,20 +289,20 @@ struct InstrumentReadTool: LLMTool {
                            state_version, last_updated_at, archived_at
                     FROM instruments WHERE instrument_id = ?
                 """,
-                arguments: [args.instrumentId]
+                arguments: [args.instrumentID]
             ) else {
                 throw LLMToolError(
                     code: "instrument_not_found",
-                    message: "no instrument with id='\(args.instrumentId)'"
+                    message: "no instrument with id='\(args.instrumentID)'"
                 )
             }
             return InstrumentReadResult(
-                instrumentId: row["instrument_id"],
+                instrumentID: row["instrument_id"],
                 domain: row["domain"],
                 kind: row["kind"],
                 name: row["name"],
-                definitionJson: row["definition_json"],
-                stateJson: row["state_json"],
+                definitionJSON: row["definition_json"],
+                stateJSON: row["state_json"],
                 stateVersion: row["state_version"],
                 lastUpdatedAt: Date(timeIntervalSince1970: Double(row["last_updated_at"] as Int64) / 1000),
                 archived: (row["archived_at"] as Int64?) != nil
@@ -268,26 +315,42 @@ struct InstrumentReadTool: LLMTool {
 // MARK: - instrument.apply_event
 
 struct InstrumentApplyEventArgs: Codable, Equatable, Sendable {
-    let instrumentId: InstrumentId
+    let instrumentID: InstrumentID
     /// The kind-specific event sub-kind (e.g. "spend", "log", "push_back").
     /// For Checklist this maps to a check/uncheck; for BoundedBudget, a spend.
     let eventKind: String
     /// JSON-encoded `EventPayload` for the kind in question.
-    let payloadJson: String
+    let payloadJSON: String
     let notes: String?
     let reasoning: String
     let actor: String
+
+    enum CodingKeys: String, CodingKey {
+        case instrumentID = "instrument_id"
+        case eventKind = "event_kind"
+        case payloadJSON = "payload_json"
+        case notes
+        case reasoning
+        case actor
+    }
 }
 
 struct InstrumentApplyEventResult: Codable, Equatable, Sendable {
-    let eventId: EventId
-    let instrumentId: InstrumentId
-    let newStateJson: String
+    let eventID: EventID
+    let instrumentID: InstrumentID
+    let newStateJSON: String
     let stateVersion: Int
+
+    enum CodingKeys: String, CodingKey {
+        case eventID = "event_id"
+        case instrumentID = "instrument_id"
+        case newStateJSON = "new_state_json"
+        case stateVersion = "state_version"
+    }
 }
 
 struct InstrumentApplyEventTool: LLMTool {
-    let id: String = ToolId.instrumentApplyEvent.rawValue
+    let id: String = ToolID.instrumentApplyEvent.rawValue
     let description: String = "Apply an event to an instrument. State is recomputed in Swift; tool returns the new state JSON."
     let jsonSchemaForArgs: String = """
     {
@@ -317,18 +380,18 @@ struct InstrumentApplyEventTool: LLMTool {
         let args = try ToolJSON.decode(InstrumentApplyEventArgs.self, from: argsJSON)
         let actor = try EventTools.parseActor(args.actor)
         let timestamp = now()
-        let eventId = ULID.generate(now: timestamp)
+        let eventID = ULID.generate(now: timestamp)
 
         // Build the InstrumentEvent envelope JSON the registry expects.
         // payload_json must already match the kind's EventPayload shape;
         // the agent is responsible for that (we surface decode errors).
         let envelopeJSON = try InstrumentTools.makeEventEnvelopeJSON(
-            eventId: eventId,
-            instrumentId: args.instrumentId,
+            eventID: eventID,
+            instrumentID: args.instrumentID,
             kind: args.eventKind,
             actor: actor.sqlValue,
             createdAt: timestamp,
-            payloadJSON: args.payloadJson,
+            payloadJSON: args.payloadJSON,
             notes: args.notes
         )
 
@@ -339,24 +402,24 @@ struct InstrumentApplyEventTool: LLMTool {
                 actor: actor,
                 kind: args.eventKind,
                 text: args.notes,
-                instrumentId: args.instrumentId,
-                payloadJSON: args.payloadJson,
+                instrumentID: args.instrumentID,
+                payloadJSON: args.payloadJSON,
                 source: "tool",
                 reasoning: args.reasoning,
                 at: timestamp,
-                eventId: eventId,
+                eventID: eventID,
                 in: dbase
             )
             let row = try InstrumentRegistry.dispatchApply(
-                instrumentId: args.instrumentId,
+                instrumentID: args.instrumentID,
                 eventJSON: envelopeJSON,
                 in: dbase,
                 now: timestamp
             )
             return InstrumentApplyEventResult(
-                eventId: eventId,
-                instrumentId: row.instrumentId,
-                newStateJson: row.stateJSON,
+                eventID: eventID,
+                instrumentID: row.instrumentID,
+                newStateJSON: row.stateJSON,
                 stateVersion: row.stateVersion
             )
         }
@@ -367,22 +430,34 @@ struct InstrumentApplyEventTool: LLMTool {
 // MARK: - instrument.update_definition
 
 struct InstrumentUpdateDefinitionArgs: Codable, Equatable, Sendable {
-    let instrumentId: InstrumentId
+    let instrumentID: InstrumentID
     /// Full replacement definition JSON. We do NOT do a per-field patch — the
     /// agent decides what the new definition is in full; partial-patch
     /// semantics live in v2.
-    let newDefinitionJson: String
+    let newDefinitionJSON: String
     let reasoning: String
     let actor: String
+
+    enum CodingKeys: String, CodingKey {
+        case instrumentID = "instrument_id"
+        case newDefinitionJSON = "new_definition_json"
+        case reasoning
+        case actor
+    }
 }
 
 struct InstrumentUpdateDefinitionResult: Codable, Equatable, Sendable {
-    let instrumentId: InstrumentId
+    let instrumentID: InstrumentID
     let updatedAt: Date
+
+    enum CodingKeys: String, CodingKey {
+        case instrumentID = "instrument_id"
+        case updatedAt = "updated_at"
+    }
 }
 
 struct InstrumentUpdateDefinitionTool: LLMTool {
-    let id: String = ToolId.instrumentUpdateDefinition.rawValue
+    let id: String = ToolID.instrumentUpdateDefinition.rawValue
     let description: String = "Replace an instrument's definition (targets, units, cadence). State is left alone."
     let jsonSchemaForArgs: String = """
     {
@@ -416,11 +491,11 @@ struct InstrumentUpdateDefinitionTool: LLMTool {
             guard try Int.fetchOne(
                 dbase,
                 sql: "SELECT COUNT(*) FROM instruments WHERE instrument_id = ?",
-                arguments: [args.instrumentId]
+                arguments: [args.instrumentID]
             ) == 1 else {
                 throw LLMToolError(
                     code: "instrument_not_found",
-                    message: "no instrument with id='\(args.instrumentId)'"
+                    message: "no instrument with id='\(args.instrumentID)'"
                 )
             }
             try dbase.execute(
@@ -429,13 +504,13 @@ struct InstrumentUpdateDefinitionTool: LLMTool {
                     SET definition_json = ?, last_updated_at = ?
                     WHERE instrument_id = ?
                 """,
-                arguments: [args.newDefinitionJson, nowMs, args.instrumentId]
+                arguments: [args.newDefinitionJSON, nowMs, args.instrumentID]
             )
             try EventLog.append(
                 actor: actor,
                 kind: "instrument_update_definition",
-                instrumentId: args.instrumentId,
-                payloadJSON: args.newDefinitionJson,
+                instrumentID: args.instrumentID,
+                payloadJSON: args.newDefinitionJSON,
                 source: "tool",
                 reasoning: args.reasoning,
                 at: timestamp,
@@ -443,7 +518,7 @@ struct InstrumentUpdateDefinitionTool: LLMTool {
             )
         }
         return try ToolJSON.encode(InstrumentUpdateDefinitionResult(
-            instrumentId: args.instrumentId,
+            instrumentID: args.instrumentID,
             updatedAt: timestamp
         ))
     }
@@ -452,19 +527,31 @@ struct InstrumentUpdateDefinitionTool: LLMTool {
 // MARK: - instrument.archive
 
 struct InstrumentArchiveArgs: Codable, Equatable, Sendable {
-    let instrumentId: InstrumentId
+    let instrumentID: InstrumentID
     let reason: String
     let reasoning: String
     let actor: String
+
+    enum CodingKeys: String, CodingKey {
+        case instrumentID = "instrument_id"
+        case reason
+        case reasoning
+        case actor
+    }
 }
 
 struct InstrumentArchiveResult: Codable, Equatable, Sendable {
-    let instrumentId: InstrumentId
+    let instrumentID: InstrumentID
     let archivedAt: Date
+
+    enum CodingKeys: String, CodingKey {
+        case instrumentID = "instrument_id"
+        case archivedAt = "archived_at"
+    }
 }
 
 struct InstrumentArchiveTool: LLMTool {
-    let id: String = ToolId.instrumentArchive.rawValue
+    let id: String = ToolID.instrumentArchive.rawValue
     let description: String = "Archive an instrument (sets archived_at). Reversible via undo."
     let jsonSchemaForArgs: String = """
     {
@@ -501,13 +588,13 @@ struct InstrumentArchiveTool: LLMTool {
                     SET archived_at = ?, last_updated_at = ?
                     WHERE instrument_id = ?
                 """,
-                arguments: [nowMs, nowMs, args.instrumentId]
+                arguments: [nowMs, nowMs, args.instrumentID]
             )
             try EventLog.append(
                 actor: actor,
                 kind: "instrument_archive",
                 text: args.reason,
-                instrumentId: args.instrumentId,
+                instrumentID: args.instrumentID,
                 source: "tool",
                 reasoning: args.reasoning,
                 at: timestamp,
@@ -515,7 +602,7 @@ struct InstrumentArchiveTool: LLMTool {
             )
         }
         return try ToolJSON.encode(InstrumentArchiveResult(
-            instrumentId: args.instrumentId,
+            instrumentID: args.instrumentID,
             archivedAt: timestamp
         ))
     }
@@ -529,8 +616,8 @@ enum InstrumentTools {
     /// We can't statically type it here without losing per-kind dispatch, so
     /// we splice raw JSON. The registry decodes against `K.EventPayload`.
     static func makeEventEnvelopeJSON(
-        eventId: EventId,
-        instrumentId: InstrumentId,
+        eventID: EventID,
+        instrumentID: InstrumentID,
         kind: String,
         actor: String,
         createdAt: Date,
@@ -548,8 +635,8 @@ enum InstrumentTools {
         }
         let iso = ISO8601DateFormatter()
         let envelope: [String: Any] = [
-            "eventId": eventId,
-            "instrumentId": instrumentId,
+            "eventID": eventID,
+            "instrumentID": instrumentID,
             "kind": kind,
             "actor": actor,
             "createdAt": iso.string(from: createdAt),

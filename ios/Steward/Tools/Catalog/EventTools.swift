@@ -16,22 +16,36 @@ struct EventCaptureArgs: Codable, Equatable, Sendable {
     let text: String
     let domain: String?
     let kind: String?
-    let payloadJson: String?
+    let payloadJSON: String?
     /// Required when the actor is an agent / coordinator (hard reject #11).
     let reasoning: String
     /// Identifies the caller for the actor column. "coordinator" |
     /// "agent:<domain>" | "user". Wire-format expressed as a string so the
     /// LLM can supply it from a generated arg schema.
     let actor: String
+
+    enum CodingKeys: String, CodingKey {
+        case text
+        case domain
+        case kind
+        case payloadJSON = "payload_json"
+        case reasoning
+        case actor
+    }
 }
 
 struct EventCaptureResult: Codable, Equatable, Sendable {
-    let eventId: EventId
+    let eventID: EventID
     let createdAt: Date
+
+    enum CodingKeys: String, CodingKey {
+        case eventID = "event_id"
+        case createdAt = "created_at"
+    }
 }
 
 struct EventCaptureTool: LLMTool {
-    let id: String = ToolId.eventCapture.rawValue
+    let id: String = ToolID.eventCapture.rawValue
     let description: String = "Log a freeform event. Use when the user reports something happened."
     let jsonSchemaForArgs: String = """
     {
@@ -62,20 +76,20 @@ struct EventCaptureTool: LLMTool {
         let actor = try EventTools.parseActor(args.actor)
         let timestamp = now()
         let db = try await provider.database()
-        let eventId = try await db.write { dbase in
+        let eventID = try await db.write { dbase in
             try EventLog.append(
                 actor: actor,
                 kind: args.kind ?? "log_entry",
                 text: args.text,
                 domain: args.domain,
-                payloadJSON: args.payloadJson,
+                payloadJSON: args.payloadJSON,
                 source: "tool",
                 reasoning: args.reasoning,
                 at: timestamp,
                 in: dbase
             )
         }
-        return try ToolJSON.encode(EventCaptureResult(eventId: eventId, createdAt: timestamp))
+        return try ToolJSON.encode(EventCaptureResult(eventID: eventID, createdAt: timestamp))
     }
 }
 
@@ -88,14 +102,25 @@ struct EventListArgs: Codable, Equatable, Sendable {
 }
 
 struct EventListItem: Codable, Equatable, Sendable {
-    let eventId: EventId
+    let eventID: EventID
     let createdAt: Date
     let actor: String
     let kind: String
     let domain: String?
     let text: String?
-    let payloadJson: String?
+    let payloadJSON: String?
     let reasoning: String?
+
+    enum CodingKeys: String, CodingKey {
+        case eventID = "event_id"
+        case createdAt = "created_at"
+        case actor
+        case kind
+        case domain
+        case text
+        case payloadJSON = "payload_json"
+        case reasoning
+    }
 }
 
 struct EventListResult: Codable, Equatable, Sendable {
@@ -103,7 +128,7 @@ struct EventListResult: Codable, Equatable, Sendable {
 }
 
 struct EventListTool: LLMTool {
-    let id: String = ToolId.eventList.rawValue
+    let id: String = ToolID.eventList.rawValue
     let description: String = "List recent events. Use to inspect history without parsing free text."
     let jsonSchemaForArgs: String = """
     {
@@ -142,13 +167,13 @@ struct EventListTool: LLMTool {
             let rows = try Row.fetchAll(dbase, sql: sql, arguments: StatementArguments(sqlArgs))
             return rows.map { row in
                 EventListItem(
-                    eventId: row["event_id"],
+                    eventID: row["event_id"],
                     createdAt: Date(timeIntervalSince1970: Double(row["created_at"] as Int64) / 1000),
                     actor: row["actor"],
                     kind: row["kind"],
                     domain: row["domain"],
                     text: row["text"],
-                    payloadJson: row["payload_json"],
+                    payloadJSON: row["payload_json"],
                     reasoning: row["reasoning"]
                 )
             }
@@ -170,6 +195,14 @@ struct EventRecentSummaryResult: Codable, Equatable, Sendable {
     let domains: [String]
     let firstAt: Date?
     let lastAt: Date?
+
+    enum CodingKeys: String, CodingKey {
+        case windowHours = "window_hours"
+        case countByKind = "count_by_kind"
+        case domains
+        case firstAt = "first_at"
+        case lastAt = "last_at"
+    }
 }
 
 /// **Not** a natural-language summary — that would be hard reject #6 territory
@@ -178,7 +211,7 @@ struct EventRecentSummaryResult: Codable, Equatable, Sendable {
 /// composes any prose it wants in its own reply, where structured numbers
 /// from the tool result back its phrasing.
 struct EventRecentSummaryTool: LLMTool {
-    let id: String = ToolId.eventRecentSummary.rawValue
+    let id: String = ToolID.eventRecentSummary.rawValue
     let description: String = "Structured counts over recent events (last N hours)."
     let jsonSchemaForArgs: String = """
     {

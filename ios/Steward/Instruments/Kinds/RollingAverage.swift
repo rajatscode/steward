@@ -21,6 +21,12 @@ enum RollingAverage: InstrumentKind {
         var unit: String
         var windowDays: Int       // for `mean`: arithmetic average over in-window samples
         var smoothing: Smoothing  // for `ema`: alpha derived from `windowDays`
+
+        enum CodingKeys: String, CodingKey {
+            case unit
+            case windowDays = "window_days"
+            case smoothing
+        }
     }
 
     // MARK: - State
@@ -33,6 +39,12 @@ enum RollingAverage: InstrumentKind {
         var current: Double
         var windowValues: [Sample]   // pruned to the trailing window on every apply
         var lastEventAt: Date?
+
+        enum CodingKeys: String, CodingKey {
+            case current
+            case windowValues = "window_values"
+            case lastEventAt = "last_event_at"
+        }
     }
 
     // MARK: - EventPayload

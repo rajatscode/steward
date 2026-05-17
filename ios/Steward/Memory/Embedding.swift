@@ -41,6 +41,12 @@ struct EmbeddingRevision: Equatable, Codable, Sendable {
     var stringValue: String {
         "NLEmbedding.\(language).rev\(revision).build\(appBuild)"
     }
+
+    enum CodingKeys: String, CodingKey {
+        case language
+        case revision
+        case appBuild = "app_build"
+    }
 }
 
 /// Process-wide embedding gateway. Lazy-initializes the NLEmbedding on first

@@ -11,7 +11,7 @@
 //  schema for their args and an `invoke(argsJSON:) -> String` that does the
 //  work. `FoundationModelsSession` (Pod B, when iOS 26 SDK lands) bridges
 //  this to the @Generable / Tool conformance internally; `MockLLMSession`
-//  invokes by toolId pattern match.
+//  invokes by toolID pattern match.
 //
 //  HARD REJECT #20: only `FoundationModelsSession.swift` and `LLMResolver.swift`
 //  may `import FoundationModels`. This file is gateway-clean.
@@ -23,7 +23,7 @@ import Foundation
 /// in `Tools/Catalog/*Tools.swift`. Each tool produces a JSON string result
 /// that the LLM provider serializes back into the transcript.
 public protocol LLMTool: Sendable {
-    /// Stable identifier; corresponds to `ToolId.rawValue`.
+    /// Stable identifier; corresponds to `ToolID.rawValue`.
     var id: String { get }
 
     /// One-sentence human-readable description for the tool catalog segment
@@ -71,7 +71,10 @@ public enum ToolJSON {
     public static var decoder: JSONDecoder {
         let d = JSONDecoder()
         d.dateDecodingStrategy = .iso8601
-        d.keyDecodingStrategy = .convertFromSnakeCase
+        // No `keyDecodingStrategy`. Tool Args + Result types carry explicit
+        // `CodingKeys` enums with snake_case rawValues — `.convertFromSnakeCase`
+        // would mangle `*ID` acronyms (`memory_id` → `memoryId`, never
+        // matching property `memoryID`).
         return d
     }
 

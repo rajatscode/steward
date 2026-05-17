@@ -37,6 +37,14 @@ enum BoundedBudget: InstrumentKind {
         var remaining: Double
         var recentEntries: [Entry]     // tail of in-period entries (cap 50)
         var rolloverBalance: Double    // carried from previous period if rollover=true
+
+        enum CodingKeys: String, CodingKey {
+            case periodStartAt = "period_start_at"
+            case periodTotal = "period_total"
+            case remaining
+            case recentEntries = "recent_entries"
+            case rolloverBalance = "rollover_balance"
+        }
     }
 
     // MARK: - EventPayload

@@ -18,14 +18,14 @@ struct MemorySaveProposal: Equatable, Sendable {
     let domain: String?
     let strength: Double
     let expiresAt: Date?
-    let provenanceEventIds: [EventId]
+    let provenanceEventIDs: [EventID]
 }
 
 enum AdmissionResult: Equatable, Sendable {
     case admit
     case rejectEphemeral(reason: String)
-    case rejectDuplicate(existing: MemoryId, cosine: Double)
-    case admitWithContradiction(conflicting: [MemoryId])
+    case rejectDuplicate(existing: MemoryID, cosine: Double)
+    case admitWithContradiction(conflicting: [MemoryID])
     case rejectAdmissionCap
 }
 
@@ -81,7 +81,7 @@ enum MemoryAdmissionPolicy {
             arguments: [proposal.type.rawValue, proposal.domain, proposal.domain]
         )
 
-        var conflicts: [MemoryId] = []
+        var conflicts: [MemoryID] = []
         for row in rows {
             let blob: Data = row["embedding"]
             guard let other = Embedder.decodeBlob(blob) else { continue }

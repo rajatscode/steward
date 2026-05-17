@@ -48,7 +48,7 @@ enum MemoryType: String, Codable, Sendable, CaseIterable, Equatable {
 
 /// In-memory shape of one row. Persisted via `MemoryItem.upsert(db:)`.
 struct MemoryItem: Equatable, Sendable, Codable {
-    let memoryId: MemoryId
+    let memoryID: MemoryID
     let type: MemoryType
     let text: String
     /// L2-normalized Float32 vector. Length must match `embeddingDim`.
@@ -61,7 +61,7 @@ struct MemoryItem: Equatable, Sendable, Codable {
     let createdAt: Date
     let expiresAt: Date?
     let domain: String?
-    let provenanceEventIds: [EventId]
+    let provenanceEventIDs: [EventID]
 
     /// Lazy decay per addendum §1.5. Computed at retrieval; nightly job
     /// persists back for indexed sort queries.
@@ -79,6 +79,22 @@ struct MemoryItem: Equatable, Sendable, Codable {
         if let exp = expiresAt, now >= exp { return true }
         return effectiveStrength(now: now) < 0.05
     }
+
+    enum CodingKeys: String, CodingKey {
+        case memoryID = "memory_id"
+        case type
+        case text
+        case embedding
+        case embeddingDim = "embedding_dim"
+        case embeddingRevision = "embedding_revision"
+        case strengthAtLastUpdate = "strength_at_last_update"
+        case lastStrengthUpdateAt = "last_strength_update_at"
+        case lastAccessedAt = "last_accessed_at"
+        case createdAt = "created_at"
+        case expiresAt = "expires_at"
+        case domain
+        case provenanceEventIDs = "provenance_event_i_ds"
+    }
 }
 
 // MARK: - GRDB row mapping
@@ -86,7 +102,7 @@ struct MemoryItem: Equatable, Sendable, Codable {
 extension MemoryItem {
 
     /// Fetch by primary key. Returns nil if missing.
-    static func fetchOne(db: Database, memoryId: MemoryId) throws -> MemoryItem? {
+    static func fetchOne(db: Database, memoryID: MemoryID) throws -> MemoryItem? {
         guard let row = try Row.fetchOne(
             db,
             sql: """
@@ -96,15 +112,15 @@ extension MemoryItem {
                 FROM memory_items
                 WHERE memory_id = ?
             """,
-            arguments: [memoryId]
+            arguments: [memoryID]
         ) else { return nil }
         return try fromRow(row)
     }
 
     /// Fetch many by primary keys (in-clause). Order is not guaranteed.
-    static func fetchMany(db: Database, memoryIds: [MemoryId]) throws -> [MemoryItem] {
-        guard !memoryIds.isEmpty else { return [] }
-        let placeholders = Array(repeating: "?", count: memoryIds.count).joined(separator: ",")
+    static func fetchMany(db: Database, memoryIDs: [MemoryID]) throws -> [MemoryItem] {
+        guard !memoryIDs.isEmpty else { return [] }
+        let placeholders = Array(repeating: "?", count: memoryIDs.count).joined(separator: ",")
         let rows = try Row.fetchAll(
             db,
             sql: """
@@ -114,7 +130,7 @@ extension MemoryItem {
                 FROM memory_items
                 WHERE memory_id IN (\(placeholders))
             """,
-            arguments: StatementArguments(memoryIds)
+            arguments: StatementArguments(memoryIDs)
         )
         return try rows.map(fromRow)
     }
@@ -125,7 +141,7 @@ extension MemoryItem {
         let lastUpdMs = Int64(lastStrengthUpdateAt.timeIntervalSince1970 * 1000)
         let lastAcc: Int64? = lastAccessedAt.map { Int64($0.timeIntervalSince1970 * 1000) }
         let expMs: Int64? = expiresAt.map { Int64($0.timeIntervalSince1970 * 1000) }
-        let provenance = (try? JSONEncoder().encode(provenanceEventIds))
+        let provenance = (try? JSONEncoder().encode(provenanceEventIDs))
             .flatMap { String(data: $0, encoding: .utf8) }
         try db.execute(
             sql: """
@@ -136,7 +152,7 @@ extension MemoryItem {
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             arguments: [
-                memoryId,
+                memoryID,
                 type.rawValue,
                 text,
                 Embedder.encodeBlob(embedding),
@@ -156,7 +172,7 @@ extension MemoryItem {
     /// Bump `last_accessed_at` and apply the retrieval boost (addendum §1.5:
     /// +0.05 on retrieval, capped at 1.0). Persists strength + bumps
     /// `last_strength_update_at` so the lazy formula stays consistent.
-    static func recordRetrieval(memoryId: MemoryId, now: Date, in db: Database) throws {
+    static func recordRetrieval(memoryID: MemoryID, now: Date, in db: Database) throws {
         let nowMs = Int64(now.timeIntervalSince1970 * 1000)
         try db.execute(
             sql: """
@@ -166,13 +182,13 @@ extension MemoryItem {
                     last_strength_update_at = ?
                 WHERE memory_id = ?
             """,
-            arguments: [nowMs, nowMs, memoryId]
+            arguments: [nowMs, nowMs, memoryID]
         )
     }
 
     /// Confirmation boost (addendum §1.5: +0.20, capped at 1.0). Called by
     /// `memory.strengthen`.
-    static func recordConfirmation(memoryId: MemoryId, now: Date, in db: Database) throws {
+    static func recordConfirmation(memoryID: MemoryID, now: Date, in db: Database) throws {
         let nowMs = Int64(now.timeIntervalSince1970 * 1000)
         try db.execute(
             sql: """
@@ -181,7 +197,7 @@ extension MemoryItem {
                     last_strength_update_at = ?
                 WHERE memory_id = ?
             """,
-            arguments: [nowMs, memoryId]
+            arguments: [nowMs, memoryID]
         )
     }
 
@@ -189,7 +205,7 @@ extension MemoryItem {
     /// events; memory rows we treat the same — instead of DELETE, we drop
     /// strength to 0 so the reranker stops surfacing it but the row stays
     /// referenceable from provenance trails.
-    static func softForget(memoryId: MemoryId, now: Date, in db: Database) throws {
+    static func softForget(memoryID: MemoryID, now: Date, in db: Database) throws {
         let nowMs = Int64(now.timeIntervalSince1970 * 1000)
         try db.execute(
             sql: """
@@ -198,7 +214,7 @@ extension MemoryItem {
                     last_strength_update_at = ?
                 WHERE memory_id = ?
             """,
-            arguments: [nowMs, memoryId]
+            arguments: [nowMs, memoryID]
         )
     }
 
@@ -206,12 +222,12 @@ extension MemoryItem {
     private static func fromRow(_ row: Row) throws -> MemoryItem {
         let blob: Data = row["embedding"]
         guard let vec = Embedder.decodeBlob(blob) else {
-            throw MemoryStoreError.corruptEmbeddingBlob(memoryId: row["memory_id"])
+            throw MemoryStoreError.corruptEmbeddingBlob(memoryID: row["memory_id"])
         }
-        let provenance: [EventId]
+        let provenance: [EventID]
         if let json: String = row["provenance_event_ids"],
            let data = json.data(using: .utf8),
-           let decoded = try? JSONDecoder().decode([EventId].self, from: data) {
+           let decoded = try? JSONDecoder().decode([EventID].self, from: data) {
             provenance = decoded
         } else {
             provenance = []
@@ -220,7 +236,7 @@ extension MemoryItem {
             throw MemoryStoreError.unknownMemoryType(raw: row["type"])
         }
         return MemoryItem(
-            memoryId: row["memory_id"],
+            memoryID: row["memory_id"],
             type: type,
             text: row["text"],
             embedding: vec,
@@ -236,13 +252,13 @@ extension MemoryItem {
                 Date(timeIntervalSince1970: Double($0) / 1000)
             },
             domain: row["domain"],
-            provenanceEventIds: provenance
+            provenanceEventIDs: provenance
         )
     }
 }
 
 enum MemoryStoreError: Error, CustomStringConvertible, Equatable {
-    case corruptEmbeddingBlob(memoryId: MemoryId)
+    case corruptEmbeddingBlob(memoryID: MemoryID)
     case unknownMemoryType(raw: String)
 
     var description: String {

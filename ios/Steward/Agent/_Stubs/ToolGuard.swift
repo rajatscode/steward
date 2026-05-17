@@ -14,7 +14,7 @@
 import Foundation
 
 enum ToolGuardError: Error, Codable, Equatable, Sendable {
-    case toolNotAllowed(ToolId)
+    case toolNotAllowed(ToolID)
     case fixedArgConflict(arg: String, expected: String, got: String)
     case valueNotAllowed(arg: String, got: String, allowed: [String])
     case argsNotObject
@@ -52,14 +52,14 @@ enum ToolGuard {
     /// overwritten; whitelist violations and disallowed tools throw.
     /// Returns the canonical (possibly rewritten) args JSON.
     static func validate(
-        _ toolId: ToolId,
+        _ toolID: ToolID,
         argsJSON: String,
         scope: ToolScope
     ) throws -> String {
-        guard scope.allowedTools.contains(toolId) else {
-            throw ToolGuardError.toolNotAllowed(toolId)
+        guard scope.allowedTools.contains(toolID) else {
+            throw ToolGuardError.toolNotAllowed(toolID)
         }
-        let constraints = scope.argConstraints[toolId] ?? .none
+        let constraints = scope.argConstraints[toolID] ?? .none
 
         // Parse, mutate, re-encode. We only handle JSON objects at the top.
         guard let data = argsJSON.data(using: .utf8),

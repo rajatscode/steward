@@ -19,13 +19,25 @@ struct MemorySaveArgs: Codable, Equatable, Sendable {
     let domain: String?
     let strength: Double?
     let expiresAt: Date?
-    let provenanceEventIds: [EventId]?
+    let provenanceEventIDs: [EventID]?
     /// How many memory.save calls have already landed in the current turn.
     /// The coordinator threads this through; if omitted we treat as zero
     /// (defensive — single-tool runs).
     let turnSaveCount: Int?
     let reasoning: String
     let actor: String
+
+    enum CodingKeys: String, CodingKey {
+        case text
+        case type
+        case domain
+        case strength
+        case expiresAt = "expires_at"
+        case provenanceEventIDs = "provenance_event_i_ds"
+        case turnSaveCount = "turn_save_count"
+        case reasoning
+        case actor
+    }
 }
 
 enum MemorySaveOutcome: String, Codable, Sendable, CaseIterable, Equatable {
@@ -39,15 +51,24 @@ enum MemorySaveOutcome: String, Codable, Sendable, CaseIterable, Equatable {
 
 struct MemorySaveResult: Codable, Equatable, Sendable {
     let outcome: MemorySaveOutcome
-    let memoryId: MemoryId?
-    let conflictingMemoryIds: [MemoryId]?
-    let existingDuplicateId: MemoryId?
+    let memoryID: MemoryID?
+    let conflictingMemoryIDs: [MemoryID]?
+    let existingDuplicateID: MemoryID?
     let duplicateCosine: Double?
     let reason: String?
+
+    enum CodingKeys: String, CodingKey {
+        case outcome
+        case memoryID = "memory_id"
+        case conflictingMemoryIDs = "conflicting_memory_i_ds"
+        case existingDuplicateID = "existing_duplicate_id"
+        case duplicateCosine = "duplicate_cosine"
+        case reason
+    }
 }
 
 struct MemorySaveTool: LLMTool {
-    let id: String = ToolId.memorySave.rawValue
+    let id: String = ToolID.memorySave.rawValue
     let description: String = "Save a durable, retrievable-by-similarity fact. Subject to admission policy."
     let jsonSchemaForArgs: String = """
     {
@@ -93,9 +114,9 @@ struct MemorySaveTool: LLMTool {
         } catch {
             return try ToolJSON.encode(MemorySaveResult(
                 outcome: .rejectedEmbedderUnavailable,
-                memoryId: nil,
-                conflictingMemoryIds: nil,
-                existingDuplicateId: nil,
+                memoryID: nil,
+                conflictingMemoryIDs: nil,
+                existingDuplicateID: nil,
                 duplicateCosine: nil,
                 reason: String(describing: error)
             ))
@@ -108,7 +129,7 @@ struct MemorySaveTool: LLMTool {
             domain: args.domain,
             strength: min(max(args.strength ?? 1.0, 0), 1),
             expiresAt: args.expiresAt,
-            provenanceEventIds: args.provenanceEventIds ?? []
+            provenanceEventIDs: args.provenanceEventIDs ?? []
         )
         let turnSaveCount = args.turnSaveCount ?? 0
         let db = try await provider.database()
@@ -127,28 +148,28 @@ struct MemorySaveTool: LLMTool {
         case .rejectAdmissionCap:
             return try ToolJSON.encode(MemorySaveResult(
                 outcome: .rejectedAdmissionCap,
-                memoryId: nil, conflictingMemoryIds: nil,
-                existingDuplicateId: nil, duplicateCosine: nil,
+                memoryID: nil, conflictingMemoryIDs: nil,
+                existingDuplicateID: nil, duplicateCosine: nil,
                 reason: "max \(MemoryAdmissionPolicy.perTurnAdmissionCap) saves per turn"
             ))
         case .rejectEphemeral(let reason):
             return try ToolJSON.encode(MemorySaveResult(
                 outcome: .rejectedEphemeral,
-                memoryId: nil, conflictingMemoryIds: nil,
-                existingDuplicateId: nil, duplicateCosine: nil,
+                memoryID: nil, conflictingMemoryIDs: nil,
+                existingDuplicateID: nil, duplicateCosine: nil,
                 reason: reason
             ))
         case .rejectDuplicate(let existing, let cosine):
             return try ToolJSON.encode(MemorySaveResult(
                 outcome: .rejectedDuplicate,
-                memoryId: nil, conflictingMemoryIds: nil,
-                existingDuplicateId: existing, duplicateCosine: cosine,
+                memoryID: nil, conflictingMemoryIDs: nil,
+                existingDuplicateID: existing, duplicateCosine: cosine,
                 reason: "duplicate of \(existing) at cosine \(cosine)"
             ))
         case .admit, .admitWithContradiction:
             let id = ULID.generate(now: timestamp)
             let item = MemoryItem(
-                memoryId: id,
+                memoryID: id,
                 type: args.type,
                 text: args.text,
                 embedding: vec,
@@ -160,19 +181,19 @@ struct MemorySaveTool: LLMTool {
                 createdAt: timestamp,
                 expiresAt: args.expiresAt,
                 domain: args.domain,
-                provenanceEventIds: proposal.provenanceEventIds
+                provenanceEventIDs: proposal.provenanceEventIDs
             )
-            let conflicts: [MemoryId]? = {
+            let conflicts: [MemoryID]? = {
                 if case .admitWithContradiction(let c) = outcome { return c }
                 return nil
             }()
             struct SavePayload: Encodable {
-                let memoryId: String
+                let memoryID: String
                 let type: String
                 let contradictions: [String]
             }
             let payload = SavePayload(
-                memoryId: id,
+                memoryID: id,
                 type: args.type.rawValue,
                 contradictions: conflicts ?? []
             )
@@ -192,9 +213,9 @@ struct MemorySaveTool: LLMTool {
             }
             let result = MemorySaveResult(
                 outcome: conflicts == nil ? .admitted : .admittedWithContradiction,
-                memoryId: id,
-                conflictingMemoryIds: conflicts,
-                existingDuplicateId: nil,
+                memoryID: id,
+                conflictingMemoryIDs: conflicts,
+                existingDuplicateID: nil,
                 duplicateCosine: nil,
                 reason: nil
             )
@@ -213,7 +234,7 @@ struct MemorySearchArgs: Codable, Equatable, Sendable {
 }
 
 struct MemorySearchHit: Codable, Equatable, Sendable {
-    let memoryId: MemoryId
+    let memoryID: MemoryID
     let type: MemoryType
     let text: String
     let domain: String?
@@ -224,6 +245,20 @@ struct MemorySearchHit: Codable, Equatable, Sendable {
     let typeBonus: Double
     let effectiveStrength: Double
     let createdAt: Date
+
+    enum CodingKeys: String, CodingKey {
+        case memoryID = "memory_id"
+        case type
+        case text
+        case domain
+        case score
+        case cosine
+        case bm25Normalized = "bm25_normalized"
+        case recency
+        case typeBonus = "type_bonus"
+        case effectiveStrength = "effective_strength"
+        case createdAt = "created_at"
+    }
 }
 
 struct MemorySearchResult: Codable, Equatable, Sendable {
@@ -231,7 +266,7 @@ struct MemorySearchResult: Codable, Equatable, Sendable {
 }
 
 struct MemorySearchTool: LLMTool {
-    let id: String = ToolId.memorySearch.rawValue
+    let id: String = ToolID.memorySearch.rawValue
     let description: String = "Hybrid memory retrieval (FTS5 + NLEmbedding cosine + recency + type bias)."
     let jsonSchemaForArgs: String = """
     {
@@ -273,7 +308,7 @@ struct MemorySearchTool: LLMTool {
         )
         let mapped = hits.map {
             MemorySearchHit(
-                memoryId: $0.item.memoryId,
+                memoryID: $0.item.memoryID,
                 type: $0.item.type,
                 text: $0.item.text,
                 domain: $0.item.domain,
@@ -293,19 +328,31 @@ struct MemorySearchTool: LLMTool {
 // MARK: - memory.forget
 
 struct MemoryForgetArgs: Codable, Equatable, Sendable {
-    let memoryId: MemoryId
+    let memoryID: MemoryID
     let reason: String
     let reasoning: String
     let actor: String
+
+    enum CodingKeys: String, CodingKey {
+        case memoryID = "memory_id"
+        case reason
+        case reasoning
+        case actor
+    }
 }
 
 struct MemoryForgetResult: Codable, Equatable, Sendable {
-    let memoryId: MemoryId
+    let memoryID: MemoryID
     let forgottenAt: Date
+
+    enum CodingKeys: String, CodingKey {
+        case memoryID = "memory_id"
+        case forgottenAt = "forgotten_at"
+    }
 }
 
 struct MemoryForgetTool: LLMTool {
-    let id: String = ToolId.memoryForget.rawValue
+    let id: String = ToolID.memoryForget.rawValue
     let description: String = "Soft-delete a memory (strength → 0). The row stays for provenance; reranker stops surfacing it."
     let jsonSchemaForArgs: String = """
     {
@@ -334,11 +381,11 @@ struct MemoryForgetTool: LLMTool {
         let timestamp = now()
         let db = try await provider.database()
         try await db.write { dbase in
-            try MemoryItem.softForget(memoryId: args.memoryId, now: timestamp, in: dbase)
+            try MemoryItem.softForget(memoryID: args.memoryID, now: timestamp, in: dbase)
             try EventLog.append(
                 actor: actor,
                 kind: "memory_forget",
-                payload: ["memory_id": args.memoryId],
+                payload: ["memory_id": args.memoryID],
                 text: args.reason,
                 source: "tool",
                 reasoning: args.reasoning,
@@ -346,25 +393,36 @@ struct MemoryForgetTool: LLMTool {
                 in: dbase
             )
         }
-        return try ToolJSON.encode(MemoryForgetResult(memoryId: args.memoryId, forgottenAt: timestamp))
+        return try ToolJSON.encode(MemoryForgetResult(memoryID: args.memoryID, forgottenAt: timestamp))
     }
 }
 
 // MARK: - memory.strengthen
 
 struct MemoryStrengthenArgs: Codable, Equatable, Sendable {
-    let memoryId: MemoryId
+    let memoryID: MemoryID
     let reasoning: String
     let actor: String
+
+    enum CodingKeys: String, CodingKey {
+        case memoryID = "memory_id"
+        case reasoning
+        case actor
+    }
 }
 
 struct MemoryStrengthenResult: Codable, Equatable, Sendable {
-    let memoryId: MemoryId
+    let memoryID: MemoryID
     let strengthenedAt: Date
+
+    enum CodingKeys: String, CodingKey {
+        case memoryID = "memory_id"
+        case strengthenedAt = "strengthened_at"
+    }
 }
 
 struct MemoryStrengthenTool: LLMTool {
-    let id: String = ToolId.memoryStrengthen.rawValue
+    let id: String = ToolID.memoryStrengthen.rawValue
     let description: String = "Bump a memory's strength by +0.20 (capped at 1.0)."
     let jsonSchemaForArgs: String = """
     {
@@ -392,18 +450,18 @@ struct MemoryStrengthenTool: LLMTool {
         let timestamp = now()
         let db = try await provider.database()
         try await db.write { dbase in
-            try MemoryItem.recordConfirmation(memoryId: args.memoryId, now: timestamp, in: dbase)
+            try MemoryItem.recordConfirmation(memoryID: args.memoryID, now: timestamp, in: dbase)
             try EventLog.append(
                 actor: actor,
                 kind: "memory_strengthen",
-                payload: ["memory_id": args.memoryId],
+                payload: ["memory_id": args.memoryID],
                 source: "tool",
                 reasoning: args.reasoning,
                 at: timestamp,
                 in: dbase
             )
         }
-        return try ToolJSON.encode(MemoryStrengthenResult(memoryId: args.memoryId, strengthenedAt: timestamp))
+        return try ToolJSON.encode(MemoryStrengthenResult(memoryID: args.memoryID, strengthenedAt: timestamp))
     }
 }
 
@@ -415,13 +473,23 @@ struct MemoryListRecentArgs: Codable, Equatable, Sendable {
 }
 
 struct MemoryListRecentItem: Codable, Equatable, Sendable {
-    let memoryId: MemoryId
+    let memoryID: MemoryID
     let type: MemoryType
     let text: String
     let domain: String?
     let createdAt: Date
     let strengthAtLastUpdate: Double
     let effectiveStrength: Double
+
+    enum CodingKeys: String, CodingKey {
+        case memoryID = "memory_id"
+        case type
+        case text
+        case domain
+        case createdAt = "created_at"
+        case strengthAtLastUpdate = "strength_at_last_update"
+        case effectiveStrength = "effective_strength"
+    }
 }
 
 struct MemoryListRecentResult: Codable, Equatable, Sendable {
@@ -429,7 +497,7 @@ struct MemoryListRecentResult: Codable, Equatable, Sendable {
 }
 
 struct MemoryListRecentTool: LLMTool {
-    let id: String = ToolId.memoryListRecent.rawValue
+    let id: String = ToolID.memoryListRecent.rawValue
     let description: String = "List recent memories by created_at desc."
     let jsonSchemaForArgs: String = """
     {
@@ -472,7 +540,7 @@ struct MemoryListRecentTool: LLMTool {
             return rows.compactMap { row -> MemoryListRecentItem? in
                 guard let item = try? mapRowToMemoryItem(row) else { return nil }
                 return MemoryListRecentItem(
-                    memoryId: item.memoryId,
+                    memoryID: item.memoryID,
                     type: item.type,
                     text: item.text,
                     domain: item.domain,
@@ -491,13 +559,13 @@ struct MemoryListRecentTool: LLMTool {
     private func mapRowToMemoryItem(_ row: Row) throws -> MemoryItem {
         let blob: Data = row["embedding"]
         guard let vec = Embedder.decodeBlob(blob) else {
-            throw MemoryStoreError.corruptEmbeddingBlob(memoryId: row["memory_id"])
+            throw MemoryStoreError.corruptEmbeddingBlob(memoryID: row["memory_id"])
         }
         guard let type = MemoryType(rawValue: row["type"]) else {
             throw MemoryStoreError.unknownMemoryType(raw: row["type"])
         }
         return MemoryItem(
-            memoryId: row["memory_id"],
+            memoryID: row["memory_id"],
             type: type,
             text: row["text"],
             embedding: vec,
@@ -513,7 +581,7 @@ struct MemoryListRecentTool: LLMTool {
                 Date(timeIntervalSince1970: Double($0) / 1000)
             },
             domain: row["domain"],
-            provenanceEventIds: []
+            provenanceEventIDs: []
         )
     }
 }

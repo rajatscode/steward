@@ -50,7 +50,7 @@ final class MemoryRetrieverTests: XCTestCase {
     ) -> MemoryItem {
         let now = Date().addingTimeInterval(-ageDays * 86_400)
         return MemoryItem(
-            memoryId: id,
+            memoryID: id,
             type: type,
             text: text,
             embedding: normalize(embedding),
@@ -62,7 +62,7 @@ final class MemoryRetrieverTests: XCTestCase {
             createdAt: now,
             expiresAt: nil,
             domain: domain,
-            provenanceEventIds: []
+            provenanceEventIDs: []
         )
     }
 
@@ -82,8 +82,8 @@ final class MemoryRetrieverTests: XCTestCase {
             for it in items { try it.upsert(in: db) }
         }
         let hits = try await MemoryRetriever.retrieve(query: "morning prompts", in: q)
-        XCTAssertTrue(hits.contains { $0.item.memoryId == "fresh" })
-        XCTAssertFalse(hits.contains { $0.item.memoryId == "dead" }, "soft-deleted rows must not surface")
+        XCTAssertTrue(hits.contains { $0.item.memoryID == "fresh" })
+        XCTAssertFalse(hits.contains { $0.item.memoryID == "dead" }, "soft-deleted rows must not surface")
     }
 
     func test_retrieve_orderedByScoreDesc_andRespectsLimit() async throws {

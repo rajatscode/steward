@@ -14,7 +14,7 @@ final class InstrumentKindsTests: XCTestCase {
     // MARK: - Helpers
 
     private func makeEvent<P: Codable & Sendable>(
-        instrument: InstrumentId = "inst-1",
+        instrument: InstrumentID = "inst-1",
         kind: String = "log",
         actor: String = "user",
         at: Date,
@@ -22,8 +22,8 @@ final class InstrumentKindsTests: XCTestCase {
         notes: String? = nil
     ) -> InstrumentEvent<P> {
         InstrumentEvent(
-            eventId: ULID.generate(now: at),
-            instrumentId: instrument,
+            eventID: ULID.generate(now: at),
+            instrumentID: instrument,
             kind: kind,
             actor: actor,
             createdAt: at,
@@ -215,15 +215,15 @@ final class InstrumentKindsTests: XCTestCase {
 
         // Day 1: check both
         let chBrushD1 = makeEvent(at: d("2026-05-10T07:30:00Z"),
-                                   payload: Checklist.EventPayload(itemId: "brush", checked: true))
+                                   payload: Checklist.EventPayload(itemID: "brush", checked: true))
         s = try Checklist.apply(event: chBrushD1, to: s, definition: def, now: d("2026-05-10T07:30:00Z"))
         let chStretchD1 = makeEvent(at: d("2026-05-10T07:31:00Z"),
-                                     payload: Checklist.EventPayload(itemId: "stretch", checked: true))
+                                     payload: Checklist.EventPayload(itemID: "stretch", checked: true))
         s = try Checklist.apply(event: chStretchD1, to: s, definition: def, now: d("2026-05-10T07:31:00Z"))
 
         // Day 2: check brush but not stretch
         let chBrushD2 = makeEvent(at: d("2026-05-11T07:30:00Z"),
-                                   payload: Checklist.EventPayload(itemId: "brush", checked: true))
+                                   payload: Checklist.EventPayload(itemID: "brush", checked: true))
         s = try Checklist.apply(event: chBrushD2, to: s, definition: def, now: d("2026-05-11T07:30:00Z"))
 
         XCTAssertEqual(s.streakByItem["brush"], 1, "brush completed yesterday → streak=1")
@@ -238,12 +238,12 @@ final class InstrumentKindsTests: XCTestCase {
         // Anchor on a Friday so the rollover happens into Saturday.
         var s = Checklist.initialState(definition: def, now: d("2026-05-15T07:00:00Z"))
         let chFri = makeEvent(at: d("2026-05-15T07:30:00Z"),
-                                payload: Checklist.EventPayload(itemId: "office", checked: true))
+                                payload: Checklist.EventPayload(itemID: "office", checked: true))
         s = try Checklist.apply(event: chFri, to: s, definition: def, now: d("2026-05-15T07:30:00Z"))
         // Saturday rollover with no event for "office" — recurrence=weekday
         // means streak should NOT reset.
         let chSat = makeEvent(at: d("2026-05-16T07:30:00Z"),
-                                payload: Checklist.EventPayload(itemId: "office", checked: false))
+                                payload: Checklist.EventPayload(itemID: "office", checked: false))
         s = try Checklist.apply(event: chSat, to: s, definition: def, now: d("2026-05-16T07:30:00Z"))
         XCTAssertEqual(s.streakByItem["office"], 1, "weekday-only item should preserve streak across Saturday")
     }

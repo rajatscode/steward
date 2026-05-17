@@ -18,6 +18,11 @@ enum WeeklyEvidenceLog: InstrumentKind {
         /// Day-of-week the week starts on, 1=Sun .. 7=Sat per ISO. We default
         /// to 2 (Monday) at the call site; the user can override.
         var weekStartDow: Int
+
+        enum CodingKeys: String, CodingKey {
+            case prompt
+            case weekStartDow = "week_start_dow"
+        }
     }
 
     // MARK: - State
@@ -38,6 +43,12 @@ enum WeeklyEvidenceLog: InstrumentKind {
         var currentWeekEntries: [Entry]
         /// Bounded tail: last 12 weeks (~quarter).
         var previousWeeksSummaries: [WeekSummary]
+
+        enum CodingKeys: String, CodingKey {
+            case currentWeekStart = "current_week_start"
+            case currentWeekEntries = "current_week_entries"
+            case previousWeeksSummaries = "previous_weeks_summaries"
+        }
     }
 
     // MARK: - EventPayload
@@ -97,13 +108,13 @@ enum WeeklyEvidenceLog: InstrumentKind {
         // CSV correction targets a specific entry's `text` cell. We replace
         // the matching row in `currentWeekEntries` by ordinal index (row_id
         // encodes index for this kind).
-        guard let rowId = correction.rowId,
-              let prefixRange = rowId.range(of: "entry-"),
-              prefixRange.lowerBound == rowId.startIndex,
-              let index = Int(rowId[prefixRange.upperBound...]),
+        guard let rowID = correction.rowID,
+              let prefixRange = rowID.range(of: "entry-"),
+              prefixRange.lowerBound == rowID.startIndex,
+              let index = Int(rowID[prefixRange.upperBound...]),
               index >= 0, index < state.currentWeekEntries.count else {
             throw InstrumentKindError.unparseableCSV(
-                reason: "WeeklyEvidenceLog correction expected rowId 'entry-<index>' within currentWeekEntries, got \(correction.rowId ?? "nil")"
+                reason: "WeeklyEvidenceLog correction expected rowID 'entry-<index>' within currentWeekEntries, got \(correction.rowID ?? "nil")"
             )
         }
         guard let newText = correction.newValue else {
