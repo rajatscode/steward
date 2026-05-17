@@ -134,7 +134,7 @@ final class CSVMirrorAvailabilityTests: XCTestCase {
         CSVMirrorAvailabilityRegistry.publish(.iCloud(folderName: "Steward"))
         let section = CaptureSection(
             settings: makeSettings(csvMirrorEnabled: true),
-            onMutate: { _ in }
+            onMutate: { _, _ in }
         )
         // Touching `body` exercises the view-tree construction; if any
         // branch above threw a fatalError or referenced a missing case,
@@ -148,7 +148,7 @@ final class CSVMirrorAvailabilityTests: XCTestCase {
         CSVMirrorAvailabilityRegistry.publish(.localSandbox(folderName: "Steward"))
         let section = CaptureSection(
             settings: makeSettings(csvMirrorEnabled: true),
-            onMutate: { _ in }
+            onMutate: { _, _ in }
         )
         _ = section.body
         XCTAssertEqual(CSVMirrorAvailabilityRegistry.current, .localSandbox(folderName: "Steward"))
@@ -159,7 +159,7 @@ final class CSVMirrorAvailabilityTests: XCTestCase {
         CSVMirrorAvailabilityRegistry.publish(.disabled)
         let section = CaptureSection(
             settings: makeSettings(csvMirrorEnabled: false),
-            onMutate: { _ in }
+            onMutate: { _, _ in }
         )
         _ = section.body
         XCTAssertEqual(CSVMirrorAvailabilityRegistry.current, .disabled)

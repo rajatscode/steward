@@ -10,7 +10,10 @@ import SwiftUI
 
 struct ModesSection: View {
     let settings: Settings?
-    var onMutate: (@escaping @Sendable (inout Settings) -> Void) -> Void
+    /// Callback shape: `(audited-field, mutate)`. SettingsView routes to
+    /// `SettingsViewModel.update(audit:_:)` so toggling mercy / pause from
+    /// the UI emits a `settings_change` audit event (v1.1 patch).
+    var onMutate: (SettingsAuditField, @escaping @Sendable (inout Settings) -> Void) -> Void
 
     @State private var pickingMercy: Bool = false
     @State private var pickingPause: Bool = false
@@ -48,7 +51,7 @@ struct ModesSection: View {
                 if newValue {
                     pickingMercy = true
                 } else {
-                    onMutate { $0.mercyModeUntil = nil }
+                    onMutate(.mercyModeUntil) { $0.mercyModeUntil = nil }
                 }
             }
         )) {
@@ -71,7 +74,7 @@ struct ModesSection: View {
                 if newValue {
                     pickingPause = true
                 } else {
-                    onMutate { $0.pauseUntil = nil }
+                    onMutate(.pauseUntil) { $0.pauseUntil = nil }
                 }
             }
         )) {
@@ -112,7 +115,8 @@ struct ModesSection: View {
     }
 
     private func engage(forMercy: Bool, until: Date) {
-        onMutate { settings in
+        let field: SettingsAuditField = forMercy ? .mercyModeUntil : .pauseUntil
+        onMutate(field) { settings in
             if forMercy {
                 settings.mercyModeUntil = until
             } else {

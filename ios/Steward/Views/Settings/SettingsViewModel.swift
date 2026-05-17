@@ -43,4 +43,20 @@ final class SettingsViewModel: ObservableObject {
             self.loadError = String(describing: error)
         }
     }
+
+    /// User-driven UI mutation. Routes through `SettingsStore.update(audit:_:)`
+    /// so a `settings_change` audit event is appended in the same db.write{}
+    /// as the settings row update (v1.1 patch: Settings UI mutations
+    /// audit-logged). If the mutation is a no-op on the audited field,
+    /// `SettingsStore` skips the event write — no duplicate rows.
+    func update(
+        audit: SettingsAuditField,
+        _ mutate: @escaping @Sendable (inout Settings) -> Void
+    ) async {
+        do {
+            self.settings = try await store.update(audit: audit, mutate)
+        } catch {
+            self.loadError = String(describing: error)
+        }
+    }
 }
