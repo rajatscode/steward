@@ -2,9 +2,9 @@
 
 Audience: Rajat. Read this first thing — before opening the project.
 
-## 1. What happened overnight
+## 1. State of the build
 
-The team built the app. The build machine didn't have Xcode 26 beta installed, so `FoundationModels` is currently stubbed behind a protocol — every agent call routes through a fake that returns canned responses. Once Xcode 26 beta is installed and the iOS deployment target is bumped, the real on-device LLM lights up automatically. No code changes needed beyond the deployment-target bump; the protocol's real implementation is already wired and gated on `#if canImport(FoundationModels)`.
+All six tracks merged to `main`. Build green on simulator. Foundation Models is gated behind a protocol (`LLMSession` / `LLMResolver`) so the app runs today against a deterministic mock — every mock reply gets a `STUB` chip stamped on it in the UI so you always know whether you're talking to the real model. Once Xcode 26 beta is installed and the iOS deployment target is bumped to 26.0, `LLMResolver` picks up `FoundationModelsSession` automatically. No code changes needed; the only two files that import `FoundationModels` are `ios/Steward/Agent/LLMResolver.swift` and `ios/Steward/Agent/FoundationModelsSession.swift`, both gated on `#if canImport(FoundationModels)`.
 
 ## 2. Install Xcode 26 beta (~30–45 min, mostly download)
 
@@ -23,7 +23,20 @@ The team built the app. The build machine didn't have Xcode 26 beta installed, s
    ```
    Should print `26.x`. If it prints `18.x`, `xcode-select` didn't take — rerun step 3.
 
-## 3. Open the project + bump deployment target (~2 min)
+## 3. Fetch the WhisperKit model (~5–10 min, one-time)
+
+Voice capture ships with the model bundled inside the app — no lazy runtime download. Run this once before your first device build:
+
+```
+cd /Users/rmehndir/dev/rajat/steward
+scripts/fetch-whisperkit-model.sh
+```
+
+This pulls `openai_whisper-large-v3-turbo` (~1.6 GB) into `ios/Steward/Resources/WhisperKitModels/` via `git-lfs`. If `git-lfs` isn't installed: `brew install git-lfs && git lfs install`. If you want a smaller dev model: `scripts/fetch-whisperkit-model.sh openai_whisper-base`. The script is idempotent — re-running with the model already present is a no-op.
+
+If you skip this step, the app still builds and runs; the voice (mic) button just won't appear in the Chat input. Everything else works.
+
+## 4. Open the project + bump deployment target (~2 min)
 
 1. ```
    open /Users/rmehndir/dev/rajat/steward/ios/Steward.xcodeproj
@@ -32,7 +45,7 @@ The team built the app. The build machine didn't have Xcode 26 beta installed, s
 3. Build: **⌘B**. Should compile clean.
 4. If it doesn't: screenshot the error, paste in chat, don't fight it.
 
-## 4. Deploy to phone (~5 min)
+## 5. Deploy to phone (~5 min)
 
 1. iPhone connected via cable, unlocked, developer mode on:
    **Settings → Privacy & Security → Developer Mode → On** (requires restart if you haven't done this before).
@@ -42,18 +55,42 @@ The team built the app. The build machine didn't have Xcode 26 beta installed, s
    - **Project → Signing & Capabilities → Team** → pick your Apple Developer team.
    - Bundle ID stays `com.rajatscode.steward`. Don't change it.
 
-## 5. First launch — what to expect
+## 6. First launch — what to expect
 
-- Splash screen, then a Foundation Models availability check. Expect a few seconds for cold init on first launch.
+- Splash, then a Foundation Models availability check (a few seconds for cold init).
+- One of three things happens at the top of the Chat tab:
+  - **No banner.** `LLMResolver` resolved to `FoundationModelsSession`. You're talking to the real on-device model. Replies have no `STUB` chip.
+  - **`STUB` chip on every reply, with a banner explaining why.** The resolver fell back to `MockLLMSession`. The banner uses a typed reason so you know exactly what's wrong:
+    - *Apple Intelligence is off* → Settings → Apple Intelligence & Siri → turn on, then relaunch.
+    - *Model is still preparing* → wait a few minutes after enabling Apple Intelligence; the model downloads in the background.
+    - *Device not eligible* → wrong hardware (needs iPhone 15 Pro/Pro Max or iPhone 16+).
+    - *SDK not compiled in* → you didn't bump the deployment target to 26.0; go back to step 4.
 - Onboarding asks for, in order:
   - Notifications permission
+  - EventKit permission (Calendar + Reminders)
   - iCloud Drive folder check (creates `Steward/` in your iCloud Drive root if iCloud Drive is enabled; falls back to local sandbox silently if not)
   - Morning brief time (default **07:00**)
   - Quiet hours (default **22:00–05:00**)
-- App drops you into the **Chat** tab. Coordinator greets per `design/coordinator-empty-state-v2.md` §1.1 — read that file beforehand if you want to know the exact opening lines and the two suggestion chips.
-- From there it's the empty-state protocol: **capture-first** (type something concrete) or **setup-first** (tap "walk me through it"). Your call. Either branch produces a working state in under five minutes.
+- App drops you into the **Chat** tab with the empty-state greeting per `design/coordinator-empty-state-v2.md` §1.1. Two chips below the input:
+  - **Catch something** → focuses the input with placeholder `"What should I catch? (sleep, weight, a spend, a thing on your mind…)"`. Type a concrete event and send. The coordinator silently logs it, acknowledges, and (if the event has a recurring shape) offers a one-sentence "want me to keep tracking this?" follow-up. Per the v2 script that's **Branch A — capture-first**.
+  - **Walk me through it** → fills the input with `walk me through it`. Send. The coordinator runs **Branch B — setup-first**: one open question, then proposes a team name, then a behavioral tone (Stay gentle / Push back a little / Push hard), then proposes exactly one starting instrument, then asks if you want a second, then proposes a morning-brief + wind-down cadence.
+- Mic button appears next to the input only if the WhisperKit model was bundled (step 3). Hold to talk; release inserts the transcript into the input (no auto-send).
 
-## 6. The 14-item DoD checklist (spec.md §20)
+## 7. The 7 instrument kinds (spec §6)
+
+The coordinator will propose these by plain name ("a 7-day rolling average for sleep"), not by kind. For your own reference when QAing:
+
+- `running_accumulator` — daily totals with rolling 7d / 30d averages
+- `bounded_budget` — daily/weekly/monthly budget with remaining
+- `rolling_average` — windowed mean or EMA (sleep, weight, mood)
+- `countdown_commitment` — "N things by end of period"
+- `weekly_evidence_log` — qualitative weekly entries
+- `checklist` — recurring items with per-item streak
+- `bounded_window` — time-window adherence (sleep window compliance)
+
+All seven implementations live in `ios/Steward/Instruments/Kinds/`. State recomputes deterministically in Swift on every event — the LLM never does instrument arithmetic.
+
+## 8. The 14-item DoD checklist (spec.md §20)
 
 Self-QA Sunday morning. Check each as you confirm it. Anything unchecked goes back to the team.
 
@@ -68,25 +105,28 @@ Self-QA Sunday morning. Check each as you confirm it. Anything unchecked goes ba
 - [ ] **9.** Spawn a second domain via chat ("make me a Money agent for discretionary spend") → domain row written, agent responds in next turn
 - [ ] **10.** Calendar read via chat ("what's on my calendar today") → EventKit read returns today's events
 - [ ] **11.** Reminder create via chat ("remind me to call mom this weekend") → EventKit Reminder created, visible in iOS Reminders app
-- [ ] **12.** Works offline — airplane mode, all of 1–11 still work except Sheets sync (which queues for when network returns)
+- [ ] **12.** Works offline — airplane mode, all of 1–11 still work except CSV mirror sync (which queues for when iCloud Drive sync next runs)
 - [ ] **13.** Audit log in Settings shows recent agent actions with `reasoning` fields, each with a working undo button
 - [ ] **14.** Notification cap is configurable — Settings exposes proactive-per-day cap, min gap, quiet hours; chat tool also lets user adjust ("up the cap to 5/day this week, I'm in a focus push")
 
-## 7. If something is broken
+## 9. If something is broken
 
-- Run qa-1's regression suite: `qa/regression-checklist.md`.
+- Regression suite: `qa/regression-checklist.md`.
 - Every agent action is in **Settings → Recent agent actions** with the `reasoning` field and a working undo button. If an agent did something unexpected, that's where you find out why and reverse it.
 - For anything weirder than a single failed action, reply in chat with the failing DoD item number and what you saw.
 
-## 8. What's not in v1 (per spec §21)
+## 10. What's not in v1 (per spec §21)
 
 Deferred on purpose. Don't be surprised when these are missing:
 
+- Apple HealthKit (top of the v1.1 list)
+- Google Sheets mirror (in-app SwiftUI grids + iCloud Drive CSV mirror are the only spreadsheet surfaces)
 - Google Calendar mirror (EventKit / iCloud Calendar is the transport; subscribe to your GCal in iOS Calendar settings if you need to see GCal events)
-- Google Sheets mirror (in-app SwiftUI grids + iCloud Drive CSV mirror only)
-- Apple HealthKit integration (top of the v1.1 list)
-- Custom user-defined instrument kinds (the seven built-in kinds in spec §6 are what you get)
+- Custom user-defined instrument kinds (the seven in §7 are what you get)
+- Multi-device CloudKit sync (single-device only)
 - Structured weekly review report (coordinator can do ad-hoc on request)
+- Background cron via webhooks
+- Written-formula support (interpretation B from the spreadsheets discussion)
 - Plaid / bank sync
 - Native Mac companion app
 - Web search (returns offline-error in v1)
