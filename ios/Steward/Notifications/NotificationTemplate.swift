@@ -24,6 +24,10 @@ enum NotificationKind: String, Codable, Sendable, CaseIterable {
     case instrumentNudge
     case commitmentDue
     case recoveryNudge
+    /// UXR v2 §6 day-0 onboarding followup (Pod B's FollowupScheduler).
+    /// Fires once at now+5h30m clamped to [13:00, 17:00] local; body varies
+    /// by whether the user captured at least one event since onboarding.
+    case onboardingFollowup
 }
 
 enum NotificationMode: String, Codable, Sendable, Equatable {
@@ -43,19 +47,26 @@ struct TemplateContext: Codable, Sendable, Equatable {
     /// upstream — templates never format times themselves so DST behavior
     /// is consistent with the chat UI).
     var briefTimeDisplay: String?
+    /// UXR v2 §6.2 followup-variant selector: did the user log at least one
+    /// event between onboarding and the followup fire time? `nil` is
+    /// treated as `false` so the no-domain / no-capture fallback wins
+    /// when callers omit the field.
+    var capturedAtLeastOneEvent: Bool?
 
     init(
         domainDisplayName: String? = nil,
         instrumentName: String? = nil,
         commitmentTitle: String? = nil,
         lapseDays: Int? = nil,
-        briefTimeDisplay: String? = nil
+        briefTimeDisplay: String? = nil,
+        capturedAtLeastOneEvent: Bool? = nil
     ) {
         self.domainDisplayName = domainDisplayName
         self.instrumentName = instrumentName
         self.commitmentTitle = commitmentTitle
         self.lapseDays = lapseDays
         self.briefTimeDisplay = briefTimeDisplay
+        self.capturedAtLeastOneEvent = capturedAtLeastOneEvent
     }
 }
 
@@ -85,6 +96,8 @@ enum NotificationTemplate {
             return commitmentDue(mode: mode, context: context)
         case .recoveryNudge:
             return recoveryNudge(mode: mode, context: context)
+        case .onboardingFollowup:
+            return onboardingFollowup(mode: mode, context: context)
         }
     }
 
@@ -187,5 +200,38 @@ enum NotificationTemplate {
         case .pause:
             return Rendered(title: "Whenever you're ready", body: "Steward is paused.")
         }
+    }
+
+    /// UXR v2 §6.2 — day-0 onboarding followup. Three deterministic variants
+    /// keyed on (domain present?, captured at least one event?):
+    ///   - has-domain + no-capture: prompt the user to log via voice.
+    ///   - has-domain + captured:   low-affect check-in, opt-out tolerated.
+    ///   - no-domain + captured:    "anything else from today?"
+    /// Mercy and pause modes use the same body — UXR §6.3 bans shame
+    /// language across all modes and the copy is already low-affect, so
+    /// differentiating buys nothing.
+    private static func onboardingFollowup(
+        mode: NotificationMode,
+        context: TemplateContext
+    ) -> Rendered {
+        let captured = context.capturedAtLeastOneEvent ?? false
+        if let name = context.domainDisplayName {
+            if captured {
+                return Rendered(
+                    title: "Steward",
+                    body: "How's \(name) feeling? Anything to log — or nothing's fine too."
+                )
+            }
+            return Rendered(
+                title: "Steward",
+                body: "You set up the \(name) team this morning. Anything to log? Hold the mic and just talk."
+            )
+        }
+        // No-domain (rare; UXR script requires at least one domain by the
+        // time this fires, but handle it defensively).
+        return Rendered(
+            title: "Steward",
+            body: "Anything else to catch from today? Two seconds of voice works."
+        )
     }
 }

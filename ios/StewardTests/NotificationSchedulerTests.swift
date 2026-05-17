@@ -401,4 +401,44 @@ final class NotificationSchedulerTests: XCTestCase {
         XCTAssertNotEqual(normal, mercy, "mercy mode must produce different copy than normal")
         XCTAssertTrue(mercy.body.contains("if it feels okay") || mercy.body.contains("Small win"))
     }
+
+    func testOnboardingFollowupHasThreeDeterministicVariants() {
+        // UXR v2 §6.2 — Pod B's FollowupScheduler depends on these exact
+        // bodies. Pin the variant logic so a copy refactor can't break it
+        // silently.
+        let domainNoCapture = TemplateContext(
+            domainDisplayName: "Health",
+            capturedAtLeastOneEvent: false
+        )
+        let r1 = NotificationTemplate.render(
+            kind: .onboardingFollowup, mode: .normal, context: domainNoCapture
+        )
+        XCTAssertTrue(r1.body.contains("Health"))
+        XCTAssertTrue(r1.body.contains("Hold the mic"))
+
+        let domainCaptured = TemplateContext(
+            domainDisplayName: "Health",
+            capturedAtLeastOneEvent: true
+        )
+        let r2 = NotificationTemplate.render(
+            kind: .onboardingFollowup, mode: .normal, context: domainCaptured
+        )
+        XCTAssertTrue(r2.body.contains("Health"))
+        XCTAssertTrue(r2.body.contains("nothing's fine too"))
+
+        let noDomain = TemplateContext(capturedAtLeastOneEvent: true)
+        let r3 = NotificationTemplate.render(
+            kind: .onboardingFollowup, mode: .normal, context: noDomain
+        )
+        XCTAssertTrue(r3.body.contains("anything else") || r3.body.contains("Two seconds"))
+
+        // Mercy + pause use the same body for this kind (UXR §6.3 ban on
+        // shame language is identical across modes; copy is already
+        // low-affect). Confirm the contract so a future divergence is
+        // intentional, not accidental.
+        let mercy = NotificationTemplate.render(
+            kind: .onboardingFollowup, mode: .mercy, context: domainCaptured
+        )
+        XCTAssertEqual(mercy.body, r2.body)
+    }
 }
