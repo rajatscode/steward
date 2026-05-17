@@ -80,6 +80,23 @@ enum Migrations {
                 VALUES (new.rowid, new.text, new.payload_json);
             END
         """)
+
+        // Hard reject #10: events is append-only forever. Enforce at the DB
+        // level — RAISE(ABORT, ...) fires before the statement so the row
+        // is untouched. Forgetting a memory writes a soft-delete event; it
+        // never deletes the original event row.
+        try db.execute(sql: """
+            CREATE TRIGGER events_no_update BEFORE UPDATE ON events
+            BEGIN
+                SELECT RAISE(ABORT, 'events is append-only');
+            END
+        """)
+        try db.execute(sql: """
+            CREATE TRIGGER events_no_delete BEFORE DELETE ON events
+            BEGIN
+                SELECT RAISE(ABORT, 'events is append-only');
+            END
+        """)
     }
 
     // MARK: - memory_items (distilled retrievable facts)

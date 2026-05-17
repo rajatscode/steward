@@ -137,6 +137,52 @@ final class SchemaTests: XCTestCase {
         }
     }
 
+    func test_eventsTable_isAppendOnly_updateRejected() throws {
+        let queue = try openMigrated(at: makeTempDBURL())
+        try queue.write { db in
+            try db.execute(sql: """
+                INSERT INTO events (event_id, created_at, actor, kind, text)
+                VALUES ('seed', 1, 'user', 'log_entry', 'original')
+            """)
+        }
+        do {
+            try queue.write { db in
+                try db.execute(sql: "UPDATE events SET text = 'modified' WHERE event_id = 'seed'")
+            }
+            XCTFail("UPDATE on events should be blocked by the events_no_update trigger")
+        } catch {
+            // Expected — RAISE(ABORT) fired.
+        }
+        // Confirm the row wasn't actually changed.
+        try queue.read { db in
+            let text = try String.fetchOne(db, sql: "SELECT text FROM events WHERE event_id = 'seed'")
+            XCTAssertEqual(text, "original", "UPDATE should have been aborted before mutation")
+        }
+    }
+
+    func test_eventsTable_isAppendOnly_deleteRejected() throws {
+        let queue = try openMigrated(at: makeTempDBURL())
+        try queue.write { db in
+            try db.execute(sql: """
+                INSERT INTO events (event_id, created_at, actor, kind, text)
+                VALUES ('seed', 1, 'user', 'log_entry', 'original')
+            """)
+        }
+        do {
+            try queue.write { db in
+                try db.execute(sql: "DELETE FROM events WHERE event_id = 'seed'")
+            }
+            XCTFail("DELETE on events should be blocked by the events_no_delete trigger")
+        } catch {
+            // Expected — RAISE(ABORT) fired.
+        }
+        // Confirm the row is still there.
+        try queue.read { db in
+            let count = try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM events WHERE event_id = 'seed'") ?? 0
+            XCTAssertEqual(count, 1, "DELETE should have been aborted before removal")
+        }
+    }
+
     func test_eventActorCheckConstraint_allowsUserWithoutReasoning() throws {
         let queue = try openMigrated(at: makeTempDBURL())
         try queue.write { db in

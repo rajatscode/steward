@@ -17,7 +17,7 @@ struct ChatView: View {
                     .foregroundStyle(.secondary)
                 Text("Chat")
                     .font(.title2.weight(.semibold))
-                Text("The coordinator conversation lives here.\nTrack E will land the real chat UI on top of this scaffold.")
+                Text("Steward listens here.\nThe coordinator comes online once the agent loop lands.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)

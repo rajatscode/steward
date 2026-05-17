@@ -38,17 +38,17 @@ struct Settings: Codable, Sendable, Equatable {
 }
 
 enum SettingsStoreError: Error, CustomStringConvertible {
-    case settingsRowMissing
-    case decodeFailed(underlying: Error)
-    case encodeFailed(underlying: Error)
+    case rowMissing
+    case decodingFailed(underlying: Error)
+    case encodingFailed(underlying: Error)
 
     var description: String {
         switch self {
-        case .settingsRowMissing:
+        case .rowMissing:
             return "settings table has no row with id=1 (migration seed missing?)"
-        case .decodeFailed(let underlying):
+        case .decodingFailed(let underlying):
             return "Settings JSON decode failed: \(underlying)"
-        case .encodeFailed(let underlying):
+        case .encodingFailed(let underlying):
             return "Settings JSON encode failed: \(underlying)"
         }
     }
@@ -56,13 +56,21 @@ enum SettingsStoreError: Error, CustomStringConvertible {
 
 /// Actor-serialized accessor for the `settings` row.
 ///
-/// `load()` is non-mutating; `update(_:)` performs a read-mutate-write inside
-/// a single `db.write { }` block so concurrent updates from different pods
-/// linearize on the actor's queue without losing fields.
+/// `load()` returns the cached value if present, decoding from disk on first
+/// access. `update(_:)` performs a read-mutate-write inside a single
+/// `db.write { }` block and refreshes the cache. Tests use
+/// `invalidateCache()` to force a re-read.
+///
+/// Hard rule (addendum §1.11): raw `UPDATE settings SET ...` outside this
+/// file is a §4 hard reject. Every other pod (B / D / F) goes through
+/// `SettingsStore.shared.update`.
 actor SettingsStore {
+    static let shared = SettingsStore()
+
     private let provider: DatabaseProvider
     private let decoder: JSONDecoder
     private let encoder: JSONEncoder
+    private var cached: Settings?
 
     init(provider: DatabaseProvider = .shared) {
         self.provider = provider
@@ -75,42 +83,45 @@ actor SettingsStore {
         let enc = JSONEncoder()
         enc.keyEncodingStrategy = .convertToSnakeCase
         enc.dateEncodingStrategy = .iso8601
-        // Stable on-disk ordering helps the iCloud CSV mirror present diff-able
-        // settings.json snapshots later (Pod F may render this).
+        // Stable on-disk ordering helps the iCloud CSV mirror present
+        // diff-able settings.json snapshots later (Pod F may render this).
+        // Locked in addendum §1.11.
         enc.outputFormatting = [.sortedKeys]
         self.encoder = enc
     }
 
-    /// Reads and decodes the seeded settings row.
+    /// Returns the current settings. Cached after first read.
     func load() async throws -> Settings {
+        if let cached { return cached }
         let db = try await provider.database()
         let dec = self.decoder
-        return try await db.read { dbase in
+        let loaded = try await db.read { dbase in
             try Self.fetch(db: dbase, decoder: dec)
         }
+        cached = loaded
+        return loaded
     }
 
-    /// Atomically reads, mutates, and writes back the settings row.
-    ///
-    /// The whole read-modify-write runs inside one `db.write { }` block so
-    /// concurrent callers can't lose updates. The actor's serialization
-    /// queues calls; the GRDB transaction guarantees DB-level atomicity.
+    /// Atomic read-modify-write. Mutation runs inside a single `db.write { }`
+    /// block; the cache is refreshed and the new value returned. Two
+    /// concurrent `update` calls serialize on the actor — last-writer wins on
+    /// overlapping fields, but neither call sees a torn read.
     @discardableResult
     func update(_ mutate: @escaping @Sendable (inout Settings) -> Void) async throws -> Settings {
         let db = try await provider.database()
         let dec = self.decoder
         let enc = self.encoder
-        return try await db.write { dbase in
+        let updated = try await db.write { dbase in
             var current = try Self.fetch(db: dbase, decoder: dec)
             mutate(&current)
             let data: Data
             do {
                 data = try enc.encode(current)
             } catch {
-                throw SettingsStoreError.encodeFailed(underlying: error)
+                throw SettingsStoreError.encodingFailed(underlying: error)
             }
             guard let json = String(data: data, encoding: .utf8) else {
-                throw SettingsStoreError.encodeFailed(
+                throw SettingsStoreError.encodingFailed(
                     underlying: NSError(domain: "Steward.SettingsStore", code: 1,
                                         userInfo: [NSLocalizedDescriptionKey: "UTF-8 encode failed"])
                 )
@@ -121,6 +132,13 @@ actor SettingsStore {
             )
             return current
         }
+        cached = updated
+        return updated
+    }
+
+    /// Test seam — discards the cache so the next `load` re-reads from disk.
+    func invalidateCache() {
+        cached = nil
     }
 
     // MARK: - Private
@@ -130,10 +148,10 @@ actor SettingsStore {
             db,
             sql: "SELECT settings_json FROM settings WHERE id = 1"
         ) else {
-            throw SettingsStoreError.settingsRowMissing
+            throw SettingsStoreError.rowMissing
         }
         guard let data = json.data(using: .utf8) else {
-            throw SettingsStoreError.decodeFailed(
+            throw SettingsStoreError.decodingFailed(
                 underlying: NSError(domain: "Steward.SettingsStore", code: 2,
                                     userInfo: [NSLocalizedDescriptionKey: "UTF-8 decode failed"])
             )
@@ -141,7 +159,7 @@ actor SettingsStore {
         do {
             return try decoder.decode(Settings.self, from: data)
         } catch {
-            throw SettingsStoreError.decodeFailed(underlying: error)
+            throw SettingsStoreError.decodingFailed(underlying: error)
         }
     }
 }

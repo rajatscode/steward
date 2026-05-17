@@ -82,11 +82,15 @@ actor DatabaseProvider {
         }
     }
 
+    #if DEBUG
     /// Resets the provider. Test-only seam: production has one process-wide
-    /// instance that lives for the app lifetime.
-    func reset() {
+    /// instance that lives for the app lifetime. Gated behind `#if DEBUG` so
+    /// the symbol literally does not exist in Release builds — a future pod
+    /// cannot accidentally nuke the queue from production code.
+    func _resetForTesting() {
         state = .unopened
     }
+    #endif
 
     // MARK: - Private
 
