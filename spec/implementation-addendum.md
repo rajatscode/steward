@@ -462,6 +462,205 @@ EventKit prompts are deferred. The Today tab's empty-state copy stays "no domain
 
 ---
 
+### 1.10 LLMSession protocol — FoundationModels abstraction  (Pod B owns)
+
+**Decision: Pod B builds against an `LLMSession` protocol, NOT against `FoundationModels` symbols directly.** Two conformances: `MockLLMSession` (always compiled; runtime fallback + tests) and `FoundationModelsSession` (gated `#if canImport(FoundationModels)`; only compiled when Xcode 26 SDK is present).
+
+**Why this is structurally important, not just a stopgap:**
+- Build machine currently has Xcode 16.3 / iOS 18.4 SDK only. No `FoundationModels` framework available at compile time.
+- User installs Xcode 26 beta on wake-up (~30 min toolchain install); binary then recompiles to bind the real conformance.
+- Same abstraction lets us write deterministic agent-loop tests with `MockLLMSession` even after Xcode 26 lands.
+- **Deployment target stays `iOS 18.4` for v0.9 builds.** Bump to iOS 26 is a single project-setting change post-toolchain-install. Until then, `FoundationModelsSession` is excluded from compilation and `MockLLMSession` is the only conformance.
+
+#### Protocol surface (provider-agnostic; uses JSON strings as universal vocabulary)
+
+```swift
+public protocol LLMSession: Actor {
+    /// Single-turn entry point. The implementation auto-loops internal tool calls
+    /// (Foundation Models does this via respond(to:)). Pod B's agent loop only
+    /// counts cross-agent handoffs against TurnBudget — never tool calls.
+    func respond(to userMessage: String) async throws -> LLMResponse
+
+    /// Discard transcript / KV cache. Call between coordinator turns to bound memory.
+    func reset() async
+}
+
+public protocol LLMSessionFactory: Sendable {
+    func makeSession(
+        systemPrompt: String,
+        tools: [any LLMTool],
+        temperature: Double
+    ) async throws -> any LLMSession
+}
+
+public struct LLMResponse: Sendable {
+    public let text: String
+    public let toolInvocations: [LLMToolInvocation]  // for audit; framework already executed them
+    public let backendKind: LLMBackendKind            // so UI can show "stub" badge on every reply
+}
+
+public struct LLMToolInvocation: Sendable, Codable {
+    public let toolID: String
+    public let argsJSON: String
+    public let resultJSON: String
+    public let executedAt: Date
+}
+
+/// Tools register their JSON schema. FoundationModelsSession bridges this to
+/// the @Generable / Tool conformance internally. MockLLMSession ignores schema
+/// and invokes by toolID pattern match.
+public protocol LLMTool: Sendable {
+    var id: String { get }
+    var description: String { get }
+    var jsonSchemaForArgs: String { get }
+    func invoke(argsJSON: String) async throws -> String
+}
+```
+
+#### Runtime resolution
+
+```swift
+public enum LLMBackendKind: Sendable, Codable {
+    case foundationModels
+    case mock(reason: MockReason)
+}
+
+public enum MockReason: String, Sendable, Codable {
+    case sdkNotCompiledIn          // built without iOS 26 SDK — current state
+    case modelNotAvailable         // FoundationModels SDK present; device says unavailable
+    case modelNotReady             // Apple Intelligence still downloading/preparing
+    case appleIntelligenceDisabled
+    case deviceNotEligible
+}
+
+public enum LLMResolver {
+    public static func resolve() async -> (factory: any LLMSessionFactory, kind: LLMBackendKind) {
+        #if canImport(FoundationModels)
+        if #available(iOS 26.0, *) {
+            let available = await SystemLanguageModel.default.isAvailable
+            if available {
+                return (FoundationModelsSessionFactory(), .foundationModels)
+            }
+            // Map SystemLanguageModel.unavailableReason to MockReason here.
+            let reason: MockReason = await mapUnavailableReason()
+            return (MockLLMSessionFactory(), .mock(reason: reason))
+        }
+        #endif
+        return (MockLLMSessionFactory(), .mock(reason: .sdkNotCompiledIn))
+    }
+}
+```
+
+#### File layout (enforces gating)
+
+```
+Steward/
+  Agent/
+    LLMSession.swift                 ← protocol + types; ALWAYS compiled
+    MockLLMSession.swift             ← MockLLMSessionFactory; ALWAYS compiled
+    FoundationModelsSession.swift    ← entire file wrapped in #if canImport(FoundationModels)
+    LLMResolver.swift                ← resolves backend; gated import inside
+    CoordinatorAgent.swift           ← uses LLMSession only; NO FoundationModels symbols
+    DomainAgent.swift                ← uses LLMSession only; NO FoundationModels symbols
+    AgentLoop.swift                  ← TurnBudget + handoff loop; NO FoundationModels symbols
+```
+
+**Hard rule: only `FoundationModelsSession.swift` and `LLMResolver.swift` may reference FoundationModels symbols. Adding `import FoundationModels` to any other file = §4 hard reject (new #20).**
+
+#### MockLLMSession fixture set (smoke-test the loop end-to-end)
+
+`MockLLMSession` is not a free-form chatbot — it pattern-matches inputs and returns canned responses sufficient to walk the **first-morning user journey** (spec §16/§17) without an LLM. Required canned turns (Pod B must implement all six):
+
+| # | User input pattern | Response behavior |
+|---|---|---|
+| 1 | First turn, `domains.count == 0` | §16 step 1+2 greeting + open question |
+| 2 | Matches `/track\|log\|monitor/` describing a life area | Propose `display_name`, `role_prompt`, default tool scope; ask to confirm |
+| 3 | Matches `/yes\|confirm\|sounds good\|do it/` after a domain proposal | Invoke `domain.create` tool with proposed args; then propose 1–3 instruments |
+| 4 | Matches `/yes\|confirm/` after instrument proposal | Invoke `instrument.create` for each; ask about cadence |
+| 5 | Matches `/log\|spent\|slept\|did\|ate/` with a quantity | Invoke `instrument.apply_event` against the most recent matching instrument |
+| 6 | Matches `/how am I doing\|status\|where do I stand/` | Invoke `instrument.read`; render numbers verbatim from tool result |
+
+All canned responses prefix the text with `[MOCK]` so the UI banner is reinforced inline. The Mock backend is sufficient to validate items #2–#7 in spec §20 DoD on simulator before the device install.
+
+#### UI integration (Pod E coordinates)
+
+- Settings tab shows current `LLMBackendKind`. When `.mock(reason:)`, displays:
+  > ⚠️ Stub language model active (reason). Calendar, instruments, and notifications all work. Conversational quality is limited until Apple Intelligence is available.
+- Every chat reply tagged with `.mock(...)` shows a small `STUB` chip next to the message bubble. Real `.foundationModels` replies show no chip.
+- No app blocking. Mock backend is fully usable for the empty-state protocol + instrument logging path.
+
+---
+
+### 1.11 SettingsStore actor contract  (first pod to need it implements)
+
+Hard reject #16 requires all settings mutations to serialize through a single `SettingsStore` actor. Pod A scaffold did not include it. **The first pod to need settings access implements it at `ios/Steward/DB/SettingsStore.swift` per this contract**, so the design is fixed regardless of who lands first.
+
+```swift
+import Foundation
+import GRDB
+
+public struct Settings: Codable, Sendable, Equatable {
+    public var quietHours: QuietHours
+    public var morningBriefTime: String                  // "HH:mm" local
+    public var maxProactiveNotificationsPerDay: Int
+    public var minNotificationGapMinutes: Int
+    public var mercyModeUntil: Date?
+    public var pauseUntil: Date?
+    public var csvMirrorEnabled: Bool
+    public var icloudDriveFolder: String
+    public var voiceCaptureEnabled: Bool
+    public var defaultAgentTemperature: Double
+
+    public struct QuietHours: Codable, Sendable, Equatable {
+        public var start: String                          // "HH:mm" local
+        public var end: String
+    }
+}
+
+public enum SettingsStoreError: Error {
+    case rowMissing            // settings table empty — should be impossible (Pod A seeds it)
+    case decodingFailed(underlying: Error)
+    case encodingFailed(underlying: Error)
+}
+
+public actor SettingsStore {
+    public static let shared = SettingsStore()
+
+    private let provider: DatabaseProvider
+    private var cached: Settings?
+
+    public init(provider: DatabaseProvider = .shared) { self.provider = provider }
+
+    /// Returns the current settings. Cached after first read.
+    public func load() async throws -> Settings
+
+    /// Atomic read-modify-write. Mutation runs inside a single `db.write { }`
+    /// block; the cache is invalidated and the new value returned. Any two
+    /// concurrent `update` calls are serialized by the actor — last-writer wins
+    /// on overlapping fields, but neither call sees a torn read.
+    @discardableResult
+    public func update(_ mutate: @Sendable (inout Settings) -> Void) async throws -> Settings
+
+    /// Test seam — discards cache; next `load` re-reads from disk.
+    public func invalidateCache() async
+}
+```
+
+**JSON ↔ Swift convention:**
+- Use `JSONDecoder` / `JSONEncoder` with `keyDecodingStrategy = .convertFromSnakeCase` / `keyEncodingStrategy = .convertToSnakeCase`. The on-disk JSON shape (per spec §5) uses snake_case; the Swift struct uses camelCase.
+- **LOCKED:** `mercyModeUntil` / `pauseUntil` use `JSONEncoder/Decoder.dateEncodingStrategy = .iso8601` (Pod A landed `SettingsStore.swift` first with this choice in commit `4335456`). Pod B/D/F must match — never write raw unix-ms to `settings_json` and never bypass the actor.
+- **LOCKED:** Encoder also sets `.sortedKeys` for stable, diff-able JSON output (useful if Pod F ever renders settings into the CSV mirror).
+
+**Who calls what:**
+- Pod B reads `defaultAgentTemperature` per LLM session creation.
+- Pod D reads `quietHours`, `morningBriefTime`, `maxProactiveNotificationsPerDay`, `minNotificationGapMinutes`, `mercyModeUntil`, `pauseUntil` on every `NotificationScheduler` call.
+- Pod F reads `csvMirrorEnabled`, `icloudDriveFolder`, `voiceCaptureEnabled` at startup.
+- Tools `mercy_mode.engage`, `pause.engage`, `quiet_hours.set` go through `SettingsStore.update`.
+
+**Hard rule:** raw `UPDATE settings SET ...` SQL anywhere outside `SettingsStore.swift` = §4 hard reject (extension of #16).
+
+---
+
 ## 2. Schema additions (Pod A owns — bake into initial migration)
 
 > **All four go into the v1 migration, not a v2 migration. No production data exists.**
@@ -611,6 +810,8 @@ END;
 17. **EventKit permission prompt during onboarding.** Deferred-to-first-use per §1.9. Any `requestFullAccessToEvents()` call before a user-initiated calendar/reminder action is a hard reject.
 18. **EventKit tool calling `EKEventStore.requestAccess` directly.** Must go through `EventKitGateway` actor so the foreground-refresh + status-change observer pattern works consistently.
 19. **LLM seeing `permissionRequired`.** That's a UI-only state. Only `ok` and `permissionDenied` flow into the model transcript.
+20. **`import FoundationModels` outside `FoundationModelsSession.swift` or `LLMResolver.swift`.** Pod B's agent loop, coordinator, domain agents, and tool implementations work against `LLMSession` (§1.10). Direct FoundationModels references in other files break the Xcode 16.3 build entirely and re-couple the architecture to a single LLM provider.
+21. **`MockLLMSession` returning non-deterministic output.** Mock responses must be pure functions of input (pattern match → fixed string). Random/timestamped output breaks the smoke-test reproducibility that's the entire point of the abstraction.
 
 ---
 
