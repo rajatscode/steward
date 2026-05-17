@@ -3,14 +3,18 @@
 //  Steward — Track E
 //
 //  Per-kind value/delta projection for the Today tab's instrument cards
-//  (Designer §2.3). The dispatch switch lives in this file ONLY — the
-//  registry-backed write path is the source of truth for state evolution
-//  (addendum §1.2); this is a read-only display layer.
+//  (Designer §2.3). Read-only.
+//
+//  ARCH NOTE (vetted): display-only switch on kindID is permitted; behavioral
+//  dispatch must go through `InstrumentRegistry` per addendum §1.2 + §4 #9.
+//  The switch below MUST be exhaustive (all 7 kinds enumerated). When a new
+//  kind lands, the compile signal in this file is the prompt to add display
+//  logic — there is no `default:` arm.
 //
 //  The function consumes a kind id + state JSON + definition JSON and returns
-//  a `InstrumentDisplay` view-model (primary value + delta line + optional
-//  stale-since line). Decoding failures yield a `.unreadable` summary so
-//  the card still renders rather than crashing.
+//  an `InstrumentDisplay` view-model (primary value + delta line + optional
+//  stale-since line). Decoding failures yield a `.unreadable` summary so the
+//  card still renders rather than crashing.
 //
 
 import Foundation
@@ -75,7 +79,25 @@ enum InstrumentDisplayProjector {
         )
     }
 
+    /// Display-only enum mirror of the 7 kinds registered by
+    /// `InstrumentRegistry.bootstrapAll()`. Adding a new InstrumentKind means
+    /// adding a case here AND adding its display projection — both compile
+    /// errors until handled, which is exactly the signal we want.
+    private enum DisplayKind: String, CaseIterable {
+        case runningAccumulator   = "running_accumulator"
+        case boundedBudget        = "bounded_budget"
+        case rollingAverage       = "rolling_average"
+        case countdownCommitment  = "countdown_commitment"
+        case weeklyEvidenceLog    = "weekly_evidence_log"
+        case checklist            = "checklist"
+        case boundedWindow        = "bounded_window"
+    }
+
     /// Returns nil on any decode failure; caller substitutes `.unreadable`.
+    /// Unknown kind id (not in our DisplayKind enum) also yields nil — UI
+    /// renders `.unreadable` rather than crashing. The exhaustive switch on
+    /// `DisplayKind` is the §4-#9-compliant shape: kindID parsing is
+    /// localized, and behavioral dispatch still lives in InstrumentRegistry.
     private static func projectKind(
         kindID: String,
         stateJSON: String,
@@ -83,28 +105,24 @@ enum InstrumentDisplayProjector {
     ) -> InstrumentDisplay? {
         guard let stateObj = jsonObject(from: stateJSON) else { return nil }
         let defObj = jsonObject(from: definitionJSON) ?? [:]
-
-        // Display-only switch on kindID. The dispatch table for state mutation
-        // is `InstrumentRegistry` — that's the only place §4 #9 cares about.
-        // This UI projector is contained to one file; adding a new kind here
-        // is the same one-line change as the registry's bootstrap list.
-        switch kindID {
-        case "running_accumulator":
-            return projectRunningAccumulator(state: stateObj, definition: defObj)
-        case "bounded_budget":
-            return projectBoundedBudget(state: stateObj, definition: defObj)
-        case "rolling_average":
-            return projectRollingAverage(state: stateObj, definition: defObj)
-        case "countdown_commitment":
-            return projectCountdownCommitment(state: stateObj, definition: defObj)
-        case "weekly_evidence_log":
-            return projectWeeklyEvidenceLog(state: stateObj, definition: defObj)
-        case "checklist":
-            return projectChecklist(state: stateObj, definition: defObj)
-        case "bounded_window":
-            return projectBoundedWindow(state: stateObj, definition: defObj)
-        default:
+        guard let kind = DisplayKind(rawValue: kindID) else {
             return InstrumentDisplay.unreadable
+        }
+        switch kind {
+        case .runningAccumulator:
+            return projectRunningAccumulator(state: stateObj, definition: defObj)
+        case .boundedBudget:
+            return projectBoundedBudget(state: stateObj, definition: defObj)
+        case .rollingAverage:
+            return projectRollingAverage(state: stateObj, definition: defObj)
+        case .countdownCommitment:
+            return projectCountdownCommitment(state: stateObj, definition: defObj)
+        case .weeklyEvidenceLog:
+            return projectWeeklyEvidenceLog(state: stateObj, definition: defObj)
+        case .checklist:
+            return projectChecklist(state: stateObj, definition: defObj)
+        case .boundedWindow:
+            return projectBoundedWindow(state: stateObj, definition: defObj)
         }
     }
 

@@ -1,6 +1,14 @@
 //
 //  AgentLoopSingleton.swift
-//  Steward — Track E wiring
+//  Steward — Track E wiring layer (NOT a canonical-surface stub).
+//
+//  ARCH NOTE (vetted): this file glues Pod B's canonical `AgentLoop` actor
+//  (Agent/AgentLoop.swift) to live process-wide state — it does NOT
+//  redeclare or duplicate Pod B's surface. Pod B exposes `public actor
+//  AgentLoop` with a custom init taking factory + registry + resolver;
+//  there is no `AgentLoop.shared` in Pod B's canonical. `AgentLoopHost.shared`
+//  is the resolved-once container so the UI doesn't rebuild the tool
+//  registry on every chat send.
 //
 //  Process-wide AgentLoop assembled at app launch:
 //   - resolves the best `LLMSessionFactory` via `LLMResolver.resolve()`,

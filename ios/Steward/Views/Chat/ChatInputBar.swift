@@ -4,7 +4,7 @@
 //
 //  Per Designer §1.5–1.6. Text field grows to multi-line up to ~6 lines;
 //  right-edge button toggles between send (when field has content) and mic
-//  (when empty). Mic is hold-to-talk; when `VoiceCaptureService` is unavailable
+//  (when empty). Mic is hold-to-talk; when `VoiceCapture` is unavailable
 //  we still render the button so the affordance is discoverable, but tap shows
 //  a tooltip — we don't pretend it works.
 //
