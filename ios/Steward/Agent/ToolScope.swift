@@ -18,7 +18,7 @@ import Foundation
 ///
 /// Hard reject #9: no `if kind == "running_accumulator"` style dispatch.
 /// All switches on this enum MUST be exhaustive without `default:`.
-public enum ToolID: String, Sendable, Codable, CaseIterable, Hashable {
+enum ToolID: String, Sendable, Codable, CaseIterable, Hashable {
     // Capture and logging
     case eventCapture        = "event.capture"
     case eventList           = "event.list"
@@ -94,7 +94,7 @@ public enum ToolID: String, Sendable, Codable, CaseIterable, Hashable {
 ///
 /// Keeping this narrow rather than wrapping the whole JSON spec — domain
 /// agents typically pin `domain="health"` and similar scalar overrides.
-public enum AnyCodableScalar: Sendable, Codable, Equatable, Hashable {
+enum AnyCodableScalar: Sendable, Codable, Equatable, Hashable {
     case string(String)
     case int(Int)
     case bool(Bool)
@@ -102,11 +102,11 @@ public enum AnyCodableScalar: Sendable, Codable, Equatable, Hashable {
     case null
 }
 
-public struct ArgConstraints: Sendable, Codable, Equatable {
-    public var fixedArgs: [String: AnyCodableScalar]
-    public var allowedValues: [String: [AnyCodableScalar]]
+struct ArgConstraints: Sendable, Codable, Equatable {
+    var fixedArgs: [String: AnyCodableScalar]
+    var allowedValues: [String: [AnyCodableScalar]]
 
-    public init(
+    init(
         fixedArgs: [String: AnyCodableScalar] = [:],
         allowedValues: [String: [AnyCodableScalar]] = [:]
     ) {
@@ -114,21 +114,21 @@ public struct ArgConstraints: Sendable, Codable, Equatable {
         self.allowedValues = allowedValues
     }
 
-    public static let none = ArgConstraints()
+    static let none = ArgConstraints()
 }
 
-public struct ToolScope: Sendable, Codable, Equatable {
-    public var allowedTools: Set<ToolID>
-    public var argConstraints: [ToolID: ArgConstraints]
+struct ToolScope: Sendable, Codable, Equatable {
+    var allowedTools: Set<ToolID>
+    var argConstraints: [ToolID: ArgConstraints]
 
-    public init(allowedTools: Set<ToolID>, argConstraints: [ToolID: ArgConstraints] = [:]) {
+    init(allowedTools: Set<ToolID>, argConstraints: [ToolID: ArgConstraints] = [:]) {
         self.allowedTools = allowedTools
         self.argConstraints = argConstraints
     }
 
     /// Coordinator scope: every tool, no arg constraints. The coordinator
     /// is allowed to do anything; domain agents narrow this down.
-    public static let coordinatorAll = ToolScope(
+    static let coordinatorAll = ToolScope(
         allowedTools: Set(ToolID.allCases),
         argConstraints: [:]
     )
@@ -138,7 +138,7 @@ public struct ToolScope: Sendable, Codable, Equatable {
     ///   - cannot create new domains or hand off again
     ///   - cannot directly engage app-wide safety (mercy/pause/quiet_hours)
     ///   - get `fixedArgs["domain"] = domain` on every tool that takes one
-    public static func domain(_ domain: String) -> ToolScope {
+    static func domain(_ domain: String) -> ToolScope {
         let allowed: Set<ToolID> = [
             .eventCapture, .eventList, .eventRecentSummary,
             .instrumentCreate, .instrumentList, .instrumentRead,
@@ -177,14 +177,14 @@ public struct ToolScope: Sendable, Codable, Equatable {
 /// Errors `ToolGuard.validate` raises. Surfaced to the model as a
 /// structured `tool_error` so the LLM can route around the denial rather
 /// than the framework throwing.
-public enum ToolGuardError: Error, CustomStringConvertible, Equatable {
+enum ToolGuardError: Error, CustomStringConvertible, Equatable {
     case toolOutOfScope(ToolID)
     case argMissing(ToolID, argName: String)
     case argPinViolation(ToolID, argName: String, expected: AnyCodableScalar)
     case argNotInWhitelist(ToolID, argName: String)
     case argsNotObject(ToolID)
 
-    public var description: String {
+    var description: String {
         switch self {
         case .toolOutOfScope(let t):
             return "Tool \(t.rawValue) is not in this agent's scope."
@@ -200,13 +200,13 @@ public enum ToolGuardError: Error, CustomStringConvertible, Equatable {
     }
 }
 
-public enum ToolGuard {
+enum ToolGuard {
     /// Validates args before dispatch. Throws on violation so the caller
     /// can surface a structured error back to the LLM. Args are passed
     /// as a parsed `[String: AnyCodableScalar]` dictionary; the parsing is
     /// the caller's responsibility (FoundationModels does it for free via
     /// `@Generable`; MockLLMSession decodes manually for its fixtures).
-    public static func validate(
+    static func validate(
         _ toolID: ToolID,
         args: [String: AnyCodableScalar],
         scope: ToolScope

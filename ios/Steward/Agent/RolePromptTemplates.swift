@@ -18,13 +18,13 @@
 
 import Foundation
 
-public enum RolePromptTone: String, Sendable, Codable, CaseIterable {
+enum RolePromptTone: String, Sendable, Codable, CaseIterable {
     case stayGentle           // default; pre-selected in UI
     case pushBackALittle
     case pushHard
 
     /// Display label for the chip in the UI.
-    public var displayLabel: String {
+    var displayLabel: String {
         switch self {
         case .stayGentle:        return "Stay gentle. Just track."
         case .pushBackALittle:   return "Push back a little when I'm slipping."
@@ -33,9 +33,9 @@ public enum RolePromptTone: String, Sendable, Codable, CaseIterable {
     }
 }
 
-public enum RolePromptTemplates {
+enum RolePromptTemplates {
     /// Renders the role_prompt with `{display_name}` substituted.
-    public static func render(tone: RolePromptTone, displayName: String) -> String {
+    static func render(tone: RolePromptTone, displayName: String) -> String {
         let template: String
         switch tone {
         case .stayGentle:

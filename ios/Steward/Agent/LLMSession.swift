@@ -20,14 +20,14 @@ import Foundation
 
 /// What backend produced a given response. The UI (the UI) reads this and
 /// stamps a `STUB` chip on every `.mock(...)` reply.
-public enum LLMBackendKind: Sendable, Codable, Equatable {
+enum LLMBackendKind: Sendable, Codable, Equatable {
     case foundationModels
     case mock(reason: MockReason)
 }
 
 /// Typed reasons MockLLMSession is in use. String-keyed dispatch is a hard
 /// reject (§4 #9) — every consumer must switch on these exhaustively.
-public enum MockReason: String, Sendable, Codable, CaseIterable {
+enum MockReason: String, Sendable, Codable, CaseIterable {
     case sdkNotCompiledIn          // built without iOS 26 SDK — current state
     case modelNotAvailable          // SDK present, device says unavailable
     case modelNotReady              // Apple Intelligence still downloading/preparing
@@ -41,7 +41,7 @@ public enum MockReason: String, Sendable, Codable, CaseIterable {
 /// both Mock and FoundationModels backends speak. FoundationModelsSession
 /// bridges this to the `@Generable` macro internally; MockLLMSession invokes
 /// tools by `id` after pattern-matching.
-public protocol LLMTool: Sendable {
+protocol LLMTool: Sendable {
     var id: String { get }
     var description: String { get }
     /// JSON Schema (draft 2020-12 subset) describing the args object.
@@ -51,13 +51,13 @@ public protocol LLMTool: Sendable {
 
 /// One tool invocation captured for audit. The framework already executed
 /// the tool by the time the response surfaces; this is the receipt.
-public struct LLMToolInvocation: Sendable, Codable, Equatable {
-    public let toolID: String
-    public let argsJSON: String
-    public let resultJSON: String
-    public let executedAt: Date
+struct LLMToolInvocation: Sendable, Codable, Equatable {
+    let toolID: String
+    let argsJSON: String
+    let resultJSON: String
+    let executedAt: Date
 
-    public init(toolID: String, argsJSON: String, resultJSON: String, executedAt: Date) {
+    init(toolID: String, argsJSON: String, resultJSON: String, executedAt: Date) {
         self.toolID = toolID
         self.argsJSON = argsJSON
         self.resultJSON = resultJSON
@@ -67,12 +67,12 @@ public struct LLMToolInvocation: Sendable, Codable, Equatable {
 
 // MARK: - Response
 
-public struct LLMResponse: Sendable, Equatable {
-    public let text: String
-    public let toolInvocations: [LLMToolInvocation]
-    public let backendKind: LLMBackendKind
+struct LLMResponse: Sendable, Equatable {
+    let text: String
+    let toolInvocations: [LLMToolInvocation]
+    let backendKind: LLMBackendKind
 
-    public init(text: String, toolInvocations: [LLMToolInvocation], backendKind: LLMBackendKind) {
+    init(text: String, toolInvocations: [LLMToolInvocation], backendKind: LLMBackendKind) {
         self.text = text
         self.toolInvocations = toolInvocations
         self.backendKind = backendKind
@@ -88,7 +88,7 @@ public struct LLMResponse: Sendable, Equatable {
 /// **The agent loop never manually loops tool calls** — only `agent.handoff`
 /// is hand-rolled, via its own LLMTool wrapper that consumes a TurnBudget
 /// hop. See addendum §4 hard reject #7.
-public protocol LLMSession: Actor {
+protocol LLMSession: Actor {
     /// Send one user message, get one final assistant reply. Any tools the
     /// model wants to call run inside this call before returning.
     func respond(to userMessage: String) async throws -> LLMResponse
@@ -102,7 +102,7 @@ public protocol LLMSession: Actor {
 /// the resolver returns; AgentLoop holds it and mints a new session
 /// per user turn (addendum §3 FM bullet: "wrap each turn in a fresh
 /// LanguageModelSession").
-public protocol LLMSessionFactory: Sendable {
+protocol LLMSessionFactory: Sendable {
     /// Identifies which backend made this factory. Surfaced via every
     /// response so the UI can tag stub replies.
     var backendKind: LLMBackendKind { get }
@@ -118,14 +118,14 @@ public protocol LLMSessionFactory: Sendable {
 
 /// Errors the LLM layer surfaces. Production code never `fatalError`s
 /// (§4 hard reject #3); all failures route through this type.
-public enum LLMSessionError: Error, CustomStringConvertible, Equatable {
+enum LLMSessionError: Error, CustomStringConvertible, Equatable {
     case backendUnavailable(reason: MockReason)
     case malformedToolArgs(toolID: String, detail: String)
     case toolNotFound(toolID: String)
     case toolExecutionFailed(toolID: String, underlying: String)
     case invalidResponse(detail: String)
 
-    public var description: String {
+    var description: String {
         switch self {
         case .backendUnavailable(let reason):
             return "LLM backend unavailable: \(reason.rawValue)"

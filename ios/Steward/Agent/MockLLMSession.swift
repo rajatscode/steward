@@ -33,11 +33,11 @@ import Foundation
 
 /// Cross-turn state the mock threads between calls to keep the empty-state
 /// flow stitched together (turn 4 → turn 5/6 reference the new instrument_id).
-public struct MockSessionState: Sendable, Equatable {
-    public var lastCreatedInstrumentID: String?
-    public var lastCreatedDomain: String?
+struct MockSessionState: Sendable, Equatable {
+    var lastCreatedInstrumentID: String?
+    var lastCreatedDomain: String?
 
-    public init(
+    init(
         lastCreatedInstrumentID: String? = nil,
         lastCreatedDomain: String? = nil
     ) {
@@ -50,30 +50,30 @@ public struct MockSessionState: Sendable, Equatable {
 /// factory — every session the factory mints shares the same store, so
 /// turn 4's instrument_id reaches turn 5/6 even though AgentLoop builds a
 /// fresh session per turn.
-public actor MockSessionStateStore {
+actor MockSessionStateStore {
     private var state: MockSessionState
 
-    public init(initial: MockSessionState = MockSessionState()) {
+    init(initial: MockSessionState = MockSessionState()) {
         self.state = initial
     }
 
-    public func snapshot() -> MockSessionState { state }
+    func snapshot() -> MockSessionState { state }
 
-    public func setLastCreatedInstrumentID(_ id: String) {
+    func setLastCreatedInstrumentID(_ id: String) {
         state.lastCreatedInstrumentID = id
     }
 
-    public func setLastCreatedDomain(_ domain: String) {
+    func setLastCreatedDomain(_ domain: String) {
         state.lastCreatedDomain = domain
     }
 }
 
-public struct MockLLMSessionFactory: LLMSessionFactory {
-    public let backendKind: LLMBackendKind
-    public let clock: @Sendable () -> Date
-    public let stateStore: MockSessionStateStore
+struct MockLLMSessionFactory: LLMSessionFactory {
+    let backendKind: LLMBackendKind
+    let clock: @Sendable () -> Date
+    let stateStore: MockSessionStateStore
 
-    public init(
+    init(
         reason: MockReason = .sdkNotCompiledIn,
         clock: @escaping @Sendable () -> Date = { Date() },
         stateStore: MockSessionStateStore = MockSessionStateStore()
@@ -83,7 +83,7 @@ public struct MockLLMSessionFactory: LLMSessionFactory {
         self.stateStore = stateStore
     }
 
-    public func makeSession(
+    func makeSession(
         systemPrompt: String,
         tools: [any LLMTool],
         temperature: Double
@@ -100,14 +100,14 @@ public struct MockLLMSessionFactory: LLMSessionFactory {
 
 /// Deterministic LLM stub. Not a chatbot — a finite state-machine that
 /// walks the empty-state flow end-to-end (spec §16, UXR v2).
-public actor MockLLMSession: LLMSession {
+actor MockLLMSession: LLMSession {
     private let systemPrompt: String
     private let tools: [any LLMTool]
     private let backendKind: LLMBackendKind
     private let clock: @Sendable () -> Date
     private let stateStore: MockSessionStateStore
 
-    public init(
+    init(
         systemPrompt: String,
         tools: [any LLMTool],
         backendKind: LLMBackendKind,
@@ -121,7 +121,7 @@ public actor MockLLMSession: LLMSession {
         self.stateStore = stateStore
     }
 
-    public func respond(to userMessage: String) async throws -> LLMResponse {
+    func respond(to userMessage: String) async throws -> LLMResponse {
         let priorState = await stateStore.snapshot()
         let plan = MockResponsePlan.plan(
             systemPrompt: systemPrompt,
@@ -163,7 +163,7 @@ public actor MockLLMSession: LLMSession {
         )
     }
 
-    public func reset() async {
+    func reset() async {
         // No persistent KV cache — mock is stateless across turns at the
         // session level; cross-turn state lives on the factory's store
         // and is not reset here.
@@ -228,26 +228,26 @@ public actor MockLLMSession: LLMSession {
 // MARK: - Response planning (pure)
 
 /// One planned tool call inside a mock response.
-public struct MockPlannedToolCall: Sendable, Equatable {
-    public let toolID: String
-    public let argsJSON: String
+struct MockPlannedToolCall: Sendable, Equatable {
+    let toolID: String
+    let argsJSON: String
 }
 
 /// The output of `MockResponsePlan.plan` — a pure function of input.
 /// Exposed publicly so tests can assert determinism without running the
 /// full actor.
-public struct MockResponsePlan: Sendable, Equatable {
-    public let text: String
-    public let toolCalls: [MockPlannedToolCall]
+struct MockResponsePlan: Sendable, Equatable {
+    let text: String
+    let toolCalls: [MockPlannedToolCall]
 
     /// Default "now" the pure-plan path uses when the caller doesn't pass
     /// one. Anchored in 2026 so emitted ISO timestamps stay plausible for
     /// schema-validation tests.
-    public static let defaultPlanningNow: Date = Date(timeIntervalSince1970: 1_779_000_000)
+    static let defaultPlanningNow: Date = Date(timeIntervalSince1970: 1_779_000_000)
 
     /// Canned dispatcher. Pure function of (systemPrompt, userMessage,
     /// state, now). Same input → same output, every time.
-    public static func plan(
+    static func plan(
         systemPrompt: String,
         userMessage: String,
         state: MockSessionState = MockSessionState(),

@@ -10,7 +10,7 @@
 
 import Foundation
 
-public protocol ToolRegistry: Sendable {
+protocol ToolRegistry: Sendable {
     /// Look up a tool by its typed ID. Returns nil if the ID isn't
     /// registered (e.g. the tool is not yet registered); AgentLoop
     /// surfaces a typed `toolNotFound` to the LLM as a structured error.
@@ -24,22 +24,22 @@ public protocol ToolRegistry: Sendable {
 
 /// Map-backed registry. Useful for tests; also the assembly point Tracks
 /// C and D wire their concrete tools into in production.
-public actor MapToolRegistry: ToolRegistry {
+actor MapToolRegistry: ToolRegistry {
     private var byID: [ToolID: any LLMTool]
 
-    public init(tools: [ToolID: any LLMTool] = [:]) {
+    init(tools: [ToolID: any LLMTool] = [:]) {
         self.byID = tools
     }
 
-    public func register(_ tool: any LLMTool, as id: ToolID) {
+    func register(_ tool: any LLMTool, as id: ToolID) {
         byID[id] = tool
     }
 
-    public func tool(for id: ToolID) async -> (any LLMTool)? {
+    func tool(for id: ToolID) async -> (any LLMTool)? {
         return byID[id]
     }
 
-    public func tools(in allowedTools: Set<ToolID>) async -> [any LLMTool] {
+    func tools(in allowedTools: Set<ToolID>) async -> [any LLMTool] {
         return byID
             .filter { allowedTools.contains($0.key) }
             .map { $0.value }

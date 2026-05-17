@@ -21,16 +21,16 @@ import Foundation
 ///
 /// `code` values are conventionally snake_case and stable across
 /// releases; PodC reviewers grep for these in test files.
-public struct LLMToolError: Error, Equatable, Sendable, CustomStringConvertible {
-    public let code: String
-    public let message: String
+struct LLMToolError: Error, Equatable, Sendable, CustomStringConvertible {
+    let code: String
+    let message: String
 
-    public init(code: String, message: String) {
+    init(code: String, message: String) {
         self.code = code
         self.message = message
     }
 
-    public var description: String {
+    var description: String {
         "LLMToolError(\(code)): \(message)"
     }
 }
@@ -42,7 +42,7 @@ public struct LLMToolError: Error, Equatable, Sendable, CustomStringConvertible 
 /// back to the LLM as a normal tool result (e.g. malformed arg JSON,
 /// permission revocations). the UI surfaces these directly; AgentLoop
 /// AgentLoop swallows them into a structured tool-result string.
-public enum ToolErrorKind: String, Sendable, Equatable, Hashable {
+enum ToolErrorKind: String, Sendable, Equatable, Hashable {
     /// Args couldn't be parsed (malformed JSON, missing required keys,
     /// unparseable RRULE, etc.).
     case argumentsInvalid
@@ -55,20 +55,20 @@ public enum ToolErrorKind: String, Sendable, Equatable, Hashable {
     case dispatch
 }
 
-public struct ToolError: Error, Equatable, Sendable, CustomStringConvertible {
-    public let kind: ToolErrorKind
-    public let message: String
+struct ToolError: Error, Equatable, Sendable, CustomStringConvertible {
+    let kind: ToolErrorKind
+    let message: String
     /// Human-readable next-step hint shown alongside `message` when
     /// surfaced through Settings → "Recent agent actions".
-    public let hint: String?
+    let hint: String?
 
-    public init(kind: ToolErrorKind, message: String, hint: String? = nil) {
+    init(kind: ToolErrorKind, message: String, hint: String? = nil) {
         self.kind = kind
         self.message = message
         self.hint = hint
     }
 
-    public var description: String {
+    var description: String {
         if let h = hint, !h.isEmpty {
             return "ToolError(\(kind.rawValue)): \(message) — \(h)"
         }
@@ -82,12 +82,12 @@ public struct ToolError: Error, Equatable, Sendable, CustomStringConvertible {
 /// tests compare strings, and (b) the audit log stores
 /// `events.payload_json` verbatim — non-deterministic output would
 /// thrash diffs and CSV mirrors for no reason.
-public enum ToolJSON {
+enum ToolJSON {
 
     /// Canonical encoder — sortedKeys + iso8601 dates. Exposed for the
     /// rare site that needs `Data` (e.g. nesting an already-encoded JSON
     /// blob into another field). New code should prefer `encode(_:)`.
-    public static var encoder: JSONEncoder {
+    static var encoder: JSONEncoder {
         let e = JSONEncoder()
         e.outputFormatting = [.sortedKeys]
         e.dateEncodingStrategy = .iso8601
@@ -95,7 +95,7 @@ public enum ToolJSON {
     }
 
     /// Canonical decoder — iso8601 dates.
-    public static var decoder: JSONDecoder {
+    static var decoder: JSONDecoder {
         let d = JSONDecoder()
         d.dateDecodingStrategy = .iso8601
         return d
@@ -105,7 +105,7 @@ public enum ToolJSON {
     /// Throws `LLMToolError(code: "encode_failed", ...)` on the (in
     /// practice, impossible) UTF-8 decode failure so leaf tools never
     /// surface a raw `EncodingError`.
-    public static func encode<T: Encodable>(_ value: T) throws -> String {
+    static func encode<T: Encodable>(_ value: T) throws -> String {
         let data = try encoder.encode(value)
         guard let s = String(data: data, encoding: .utf8) else {
             throw LLMToolError(
@@ -119,7 +119,7 @@ public enum ToolJSON {
     /// Decode a Codable value from a UTF-8 JSON string. Throws
     /// `LLMToolError(code: "arguments_invalid", ...)` with the underlying
     /// reason on malformed input — tools surface this verbatim to the LLM.
-    public static func decode<T: Decodable>(_ type: T.Type, from string: String) throws -> T {
+    static func decode<T: Decodable>(_ type: T.Type, from string: String) throws -> T {
         guard let data = string.data(using: .utf8) else {
             throw LLMToolError(
                 code: "arguments_invalid",

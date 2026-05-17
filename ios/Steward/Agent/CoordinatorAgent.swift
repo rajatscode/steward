@@ -14,18 +14,18 @@
 
 import Foundation
 
-public struct CoordinatorAgent: Sendable {
-    public let promptAssembler: PromptAssembler
+struct CoordinatorAgent: Sendable {
+    let promptAssembler: PromptAssembler
 
-    public init(promptAssembler: PromptAssembler = PromptAssembler()) {
+    init(promptAssembler: PromptAssembler = PromptAssembler()) {
         self.promptAssembler = promptAssembler
     }
 
     /// Coordinator scope: every tool, no arg constraints.
-    public var scope: ToolScope { ToolScope.coordinatorAll }
+    var scope: ToolScope { ToolScope.coordinatorAll }
 
     /// Assemble the coordinator's system prompt for a single turn.
-    public func systemPrompt(runtime: RuntimeContext) -> AssembledPrompt {
+    func systemPrompt(runtime: RuntimeContext) -> AssembledPrompt {
         return promptAssembler.assemble(
             for: .coordinator,
             runtime: runtime,

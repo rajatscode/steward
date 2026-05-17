@@ -12,7 +12,7 @@
 
 import Foundation
 
-public enum EmptyStateRouter {
+enum EmptyStateRouter {
     /// Phrases that indicate the user wants to be walked through setup.
     /// Match is exact (after lowercase+trim) per v2 §2.
     static let setupIntentPhrases: Set<String> = [
@@ -38,7 +38,7 @@ public enum EmptyStateRouter {
     /// Returns the branch deterministically. The string is normalized once
     /// (lowercase + trim of leading/trailing whitespace + collapse internal
     /// whitespace) and matched against the two sets in priority order.
-    public static func route(_ rawMessage: String) -> EmptyStateBranch {
+    static func route(_ rawMessage: String) -> EmptyStateBranch {
         let normalized = normalize(rawMessage)
 
         if setupIntentPhrases.contains(normalized) {

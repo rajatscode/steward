@@ -16,7 +16,7 @@ import SwiftUI
 //
 // Per brand brief, Satoshi-Bold is the primary display weight (motto, large
 // titles). Use the lighter weights sparingly for supporting display copy.
-public enum SatoshiWeight {
+enum SatoshiWeight {
     case light
     case regular
     case medium
@@ -24,7 +24,7 @@ public enum SatoshiWeight {
     case black
 
     /// PostScript name matched to the bundled OTF.
-    public var postScriptName: String {
+    var postScriptName: String {
         switch self {
         case .light:   return "Satoshi-Light"
         case .regular: return "Satoshi-Regular"
@@ -35,7 +35,7 @@ public enum SatoshiWeight {
     }
 }
 
-public extension Font {
+extension Font {
     /// Outkeep display face. Use for app name, motto, and large titles only;
     /// body copy stays on SF Pro for legibility and dynamic-type fidelity.
     static func satoshi(_ weight: SatoshiWeight, size: CGFloat) -> Font {

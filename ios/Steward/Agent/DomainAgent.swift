@@ -16,18 +16,18 @@
 
 import Foundation
 
-public struct DomainAgent: Sendable {
-    public let domain: String
-    public let displayName: String
+struct DomainAgent: Sendable {
+    let domain: String
+    let displayName: String
     /// The role_prompt stored in the `domains` row. Passed straight into
     /// the PromptAssembler's role_prompt segment. Sandwiched between the
     /// two `<<INVARIANT>>` blocks (§1.7) so the user cannot relax the
     /// anti-moralization rules by editing it.
-    public let rolePrompt: String
+    let rolePrompt: String
 
-    public let promptAssembler: PromptAssembler
+    let promptAssembler: PromptAssembler
 
-    public init(
+    init(
         domain: String,
         displayName: String,
         rolePrompt: String,
@@ -39,9 +39,9 @@ public struct DomainAgent: Sendable {
         self.promptAssembler = promptAssembler
     }
 
-    public var scope: ToolScope { ToolScope.domain(domain) }
+    var scope: ToolScope { ToolScope.domain(domain) }
 
-    public func systemPrompt(runtime: RuntimeContext) -> AssembledPrompt {
+    func systemPrompt(runtime: RuntimeContext) -> AssembledPrompt {
         return promptAssembler.assemble(
             for: .domain(domain),
             runtime: runtime,

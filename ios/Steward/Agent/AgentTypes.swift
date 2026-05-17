@@ -21,7 +21,7 @@ import Foundation
 /// Who is running the LLM call. Enum, not string — §4 #9 forbids string-keyed
 /// kind dispatch. Coordinator and DomainAgent each construct the right
 /// AgentRole; PromptAssembler switches on this.
-public enum AgentRole: Sendable, Equatable, Hashable {
+enum AgentRole: Sendable, Equatable, Hashable {
     case coordinator
     case domain(String) // domain identifier ("health", "money", ...)
 }
@@ -35,24 +35,24 @@ public enum AgentRole: Sendable, Equatable, Hashable {
 /// Everything PromptAssembler needs to assemble a system prompt for a turn.
 /// Sub-pods fill the fields they care about; missing fields render to empty
 /// segments (PromptAssembler skips them rather than emitting "(none)").
-public struct RuntimeContext: Sendable, Equatable {
-    public var now: Date
-    public var localTimezone: TimeZone
-    public var conversationState: ConversationState
-    public var emptyStateBranch: EmptyStateBranch?
-    public var mercyMode: MercyMode
-    public var pauseUntil: Date?
-    public var activeDomains: [DomainSummary]
-    public var openCommitments: [CommitmentSummary]
-    public var recentEventsSummary: String?
-    public var memoryHitsSummary: String?
-    public var todayCalendarSummary: String?
+struct RuntimeContext: Sendable, Equatable {
+    var now: Date
+    var localTimezone: TimeZone
+    var conversationState: ConversationState
+    var emptyStateBranch: EmptyStateBranch?
+    var mercyMode: MercyMode
+    var pauseUntil: Date?
+    var activeDomains: [DomainSummary]
+    var openCommitments: [CommitmentSummary]
+    var recentEventsSummary: String?
+    var memoryHitsSummary: String?
+    var todayCalendarSummary: String?
     /// The user-visible message currently being processed. NEVER trimmed.
-    public var userMessage: String
+    var userMessage: String
     /// Optional prior-turn compaction; injected when running multi-turn.
-    public var priorTurnSummary: String?
+    var priorTurnSummary: String?
 
-    public init(
+    init(
         now: Date,
         localTimezone: TimeZone,
         conversationState: ConversationState,
@@ -83,25 +83,25 @@ public struct RuntimeContext: Sendable, Equatable {
     }
 }
 
-public enum MercyMode: Sendable, Equatable, Hashable {
+enum MercyMode: Sendable, Equatable, Hashable {
     case off
     case on(until: Date?)
 }
 
-public struct DomainSummary: Sendable, Equatable, Hashable, Codable {
-    public let domain: String
-    public let displayName: String
-    public init(domain: String, displayName: String) {
+struct DomainSummary: Sendable, Equatable, Hashable, Codable {
+    let domain: String
+    let displayName: String
+    init(domain: String, displayName: String) {
         self.domain = domain
         self.displayName = displayName
     }
 }
 
-public struct CommitmentSummary: Sendable, Equatable, Hashable, Codable {
-    public let title: String
-    public let dueAt: Date?
-    public let domain: String?
-    public init(title: String, dueAt: Date?, domain: String?) {
+struct CommitmentSummary: Sendable, Equatable, Hashable, Codable {
+    let title: String
+    let dueAt: Date?
+    let domain: String?
+    init(title: String, dueAt: Date?, domain: String?) {
         self.title = title
         self.dueAt = dueAt
         self.domain = domain
@@ -111,15 +111,15 @@ public struct CommitmentSummary: Sendable, Equatable, Hashable, Codable {
 // MARK: - Turn outcome
 
 /// What AgentLoop returns to the caller after one user message.
-public struct CoordinatorResponse: Sendable, Equatable {
-    public let turnID: TurnID
-    public let text: String
-    public let backendKind: LLMBackendKind
-    public let toolInvocations: [LLMToolInvocation]
-    public let handoffsConsumed: Int
-    public let budgetExhausted: Bool
+struct CoordinatorResponse: Sendable, Equatable {
+    let turnID: TurnID
+    let text: String
+    let backendKind: LLMBackendKind
+    let toolInvocations: [LLMToolInvocation]
+    let handoffsConsumed: Int
+    let budgetExhausted: Bool
 
-    public init(
+    init(
         turnID: TurnID,
         text: String,
         backendKind: LLMBackendKind,

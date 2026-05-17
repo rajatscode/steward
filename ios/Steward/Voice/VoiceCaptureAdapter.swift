@@ -17,17 +17,17 @@
 
 import Foundation
 
-public final class VoiceCaptureAdapter: VoiceCapture {
-    public init() {}
+final class VoiceCaptureAdapter: VoiceCapture {
+    init() {}
 
-    public var availability: VoiceAvailability {
+    var availability: VoiceAvailability {
         get async {
             let readiness = await VoiceCaptureService.shared.readiness
             return Self.availability(for: readiness)
         }
     }
 
-    public func beginRecording() async {
+    func beginRecording() async {
         // Press-down is fire-and-forget per the protocol contract. A failure
         // here (e.g. mic permission flipped, engine refused to start) leaves
         // `isRecording == false` in the service, so the subsequent
@@ -43,13 +43,13 @@ public final class VoiceCaptureAdapter: VoiceCapture {
         }
     }
 
-    public func endRecordingAndTranscribe() async throws -> String? {
+    func endRecordingAndTranscribe() async throws -> String? {
         let text = try await VoiceCaptureService.shared.stopAndTranscribe()
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? nil : trimmed
     }
 
-    public func cancelRecording() async {
+    func cancelRecording() async {
         await VoiceCaptureService.shared.cancelRecording()
     }
 

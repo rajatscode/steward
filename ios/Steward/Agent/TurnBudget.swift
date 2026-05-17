@@ -11,12 +11,12 @@
 
 import Foundation
 
-public struct TurnBudget: Sendable, Equatable {
-    public var handoffsRemaining: Int
-    public let contextTokenCeiling: Int
-    public let startedAt: Date
+struct TurnBudget: Sendable, Equatable {
+    var handoffsRemaining: Int
+    let contextTokenCeiling: Int
+    let startedAt: Date
 
-    public init(
+    init(
         handoffsRemaining: Int = TurnBudget.defaultHandoffs,
         contextTokenCeiling: Int,
         startedAt: Date
@@ -26,11 +26,11 @@ public struct TurnBudget: Sendable, Equatable {
         self.startedAt = startedAt
     }
 
-    public static let defaultHandoffs: Int = 8
-    public static let coordinatorTokenCeiling: Int = 9_000
-    public static let domainTokenCeiling: Int = 6_000
+    static let defaultHandoffs: Int = 8
+    static let coordinatorTokenCeiling: Int = 9_000
+    static let domainTokenCeiling: Int = 6_000
 
-    public mutating func consumeHandoff() throws {
+    mutating func consumeHandoff() throws {
         guard handoffsRemaining > 0 else {
             throw AgentError.handoffBudgetExhausted
         }
@@ -41,7 +41,7 @@ public struct TurnBudget: Sendable, Equatable {
 /// Errors AgentLoop and its helpers surface. No `fatalError`/`precondition`
 /// in production paths (§4 hard reject #3); all failures route through here
 /// or `LLMSessionError`.
-public enum AgentError: Error, CustomStringConvertible, Equatable {
+enum AgentError: Error, CustomStringConvertible, Equatable {
     case handoffBudgetExhausted
     case noActiveDomainsForHandoff(requested: String)
     case domainNotFound(domain: String)
@@ -49,7 +49,7 @@ public enum AgentError: Error, CustomStringConvertible, Equatable {
     case followupOutsideValidWindow
     case settingsLoadFailed(detail: String)
 
-    public var description: String {
+    var description: String {
         switch self {
         case .handoffBudgetExhausted:
             return "Cross-agent handoff budget exhausted (8 hops max per turn)."

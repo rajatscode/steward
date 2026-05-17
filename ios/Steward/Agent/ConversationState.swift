@@ -14,7 +14,7 @@
 
 import Foundation
 
-public enum ConversationState: Sendable, Equatable, Hashable, Codable {
+enum ConversationState: Sendable, Equatable, Hashable, Codable {
     /// User has never spoken; UI rendered the §1.1 greeting bubble.
     case awaitingFirstMessage
     /// Branch A — coordinator just acknowledged a captured event and may
@@ -41,7 +41,7 @@ public enum ConversationState: Sendable, Equatable, Hashable, Codable {
 
     /// Stable token MockLLMSession reads from the system prompt to
     /// disambiguate the six canned turns. Real FM ignores it.
-    public var mockHintToken: String {
+    var mockHintToken: String {
         switch self {
         case .awaitingFirstMessage:        return "awaiting_first_message"
         case .capturedAwaitingTrackOffer:  return "captured_awaiting_track_offer"
@@ -59,12 +59,12 @@ public enum ConversationState: Sendable, Equatable, Hashable, Codable {
 /// Which empty-state branch routed this turn. Set by `EmptyStateRouter`
 /// pre-LLM; consumed by `PromptAssembler` and `AgentLoop` for state
 /// transitions.
-public enum EmptyStateBranch: Sendable, Equatable, Hashable, Codable {
+enum EmptyStateBranch: Sendable, Equatable, Hashable, Codable {
     case branchACaptureFirst
     case branchBSetupFirst
     case branchCUnclear
 
-    public var mockHintToken: String {
+    var mockHintToken: String {
         switch self {
         case .branchACaptureFirst: return "branch_a"
         case .branchBSetupFirst:   return "branch_b"

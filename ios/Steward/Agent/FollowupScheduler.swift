@@ -25,7 +25,7 @@
 import Foundation
 
 /// Outcome of a single onboarding-followup schedule attempt.
-public enum FollowupSchedulingOutcome: Sendable, Equatable {
+enum FollowupSchedulingOutcome: Sendable, Equatable {
     case scheduled(notificationID: String, firesAt: Date)
     case skippedNoEngagement       // Branch C tail with neither domain nor event
     case skippedOutsideWindow      // now + 5h30m falls after 17:00 local
@@ -37,11 +37,11 @@ public enum FollowupSchedulingOutcome: Sendable, Equatable {
 
 /// Snapshot of what happened in the empty-state script — picks which of
 /// the three §6.2 variants fires.
-public struct OnboardingOutcome: Sendable, Equatable {
-    public let spawnedDomainDisplayName: String?
-    public let capturedAtLeastOneEvent: Bool
+struct OnboardingOutcome: Sendable, Equatable {
+    let spawnedDomainDisplayName: String?
+    let capturedAtLeastOneEvent: Bool
 
-    public init(spawnedDomainDisplayName: String?, capturedAtLeastOneEvent: Bool) {
+    init(spawnedDomainDisplayName: String?, capturedAtLeastOneEvent: Bool) {
         self.spawnedDomainDisplayName = spawnedDomainDisplayName
         self.capturedAtLeastOneEvent = capturedAtLeastOneEvent
     }
@@ -119,7 +119,7 @@ actor FollowupScheduler {
     ///   - candidate is at/after 17:00 of `now`'s day → return nil; skip
     ///     entirely (snapping to 17:00 would land in the past; the day-0
     ///     followup belongs on day 0).
-    public static func computeFireTime(now: Date, timezone: TimeZone) -> Date? {
+    static func computeFireTime(now: Date, timezone: TimeZone) -> Date? {
         var cal = Calendar(identifier: .gregorian)
         cal.timeZone = timezone
 

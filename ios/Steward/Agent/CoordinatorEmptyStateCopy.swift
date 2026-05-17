@@ -22,12 +22,12 @@
 
 import Foundation
 
-public enum CoordinatorEmptyStateCopy {
+enum CoordinatorEmptyStateCopy {
 
     // MARK: - §1.1 Greeting (UI-rendered; reproduced for LLM anchoring)
 
     /// Time-of-day variant per v2 §1.1. `hour` is 0..23 local.
-    public static func greeting(forLocalHour hour: Int) -> String {
+    static func greeting(forLocalHour hour: Int) -> String {
         // ≥04:00 & <12:00 → Morning; ≥12:00 & <17:00 → Afternoon; else Evening.
         // Between 00:00 and 04:00 → drop greeting, lead with "I'm Outkeep."
         if hour >= 0 && hour < 4 {
@@ -48,34 +48,34 @@ public enum CoordinatorEmptyStateCopy {
 
     /// §3.1 verbatim fallback. The LLM should produce a one-sentence
     /// natural acknowledgement; this is the safe fallback.
-    public static let branchA_acknowledgementFallback = "Logged."
+    static let branchA_acknowledgementFallback = "Logged."
 
     /// §3.2 retroactive offer templates. The LLM picks the closest match
     /// by event shape; if no clear shape, it MUST NOT offer a track.
-    public static let branchA_offerSleep =
+    static let branchA_offerSleep =
         "Want me to start keeping sleep for you, so you don't have to remember to log it? Quick yes or no."
 
-    public static let branchA_offerWeight =
+    static let branchA_offerWeight =
         "I can start tracking weight over time if you want — say yes and I'll just average what you tell me."
 
-    public static let branchA_offerMoney =
+    static let branchA_offerMoney =
         "Should I start keeping a running tally on spending? You can give me a budget or just let it accumulate."
 
-    public static let branchA_offerChore =
+    static let branchA_offerChore =
         "Want me to keep this as a thing to follow up on, or are you good?"
 
-    public static let branchA_offerMood =
+    static let branchA_offerMood =
         "Want a quiet log of how the days feel? No targets, no scores — just somewhere it lives."
 
-    public static let branchA_offerGeneric =
+    static let branchA_offerGeneric =
         "Should I start keeping track of this so it doesn't fall off?"
 
     /// §3.3 — yes path. Template-only single-confirmation copy.
-    public static let branchA_doneAfterYes =
+    static let branchA_doneAfterYes =
         "Done. You have a {Team Name} track now, with {instrument description}. I'll add to it whenever you tell me. Anything else on your mind?"
 
     /// §3.4 — no path. Verbatim.
-    public static let branchA_acknowledgementAfterNo =
+    static let branchA_acknowledgementAfterNo =
         "Cool. I'll keep the log either way — tell me anytime."
 
     // MARK: - §4 Branch B — setup-first
@@ -83,7 +83,7 @@ public enum CoordinatorEmptyStateCopy {
     /// §4.1 B1 — verbatim default copy. LLM may slightly rephrase for
     /// warmth but MUST preserve: single question, concrete examples,
     /// permission to add more later, no "decay" language.
-    public static let branchB_step1_openQuestion = """
+    static let branchB_step1_openQuestion = """
         Cool. One question to start: what's one thing you'd like me to help carry?
 
         Could be sleep, money, the kitchen, therapy follow-through, a hobby — whatever's \
@@ -92,11 +92,11 @@ public enum CoordinatorEmptyStateCopy {
 
     /// §4.1 fast-tap chip labels (UI-rendered by `ChatView`; reproduced for
     /// LLM context).
-    public static let branchB_step1_chipLabels =
+    static let branchB_step1_chipLabels =
         "Sleep · Money · The kitchen · Hobbies · Something else"
 
     /// §4.2 B2 — verbatim tone-toggle bubble.
-    public static let branchB_step2_toneToggle = """
+    static let branchB_step2_toneToggle = """
         Got it. I'll call this the {Team Name} team. How should it act?
 
         - Stay gentle. Just track. (default)
@@ -105,56 +105,56 @@ public enum CoordinatorEmptyStateCopy {
         """
 
     /// §4.3 B3 — verbatim per-team default instrument proposals.
-    public static let branchB_step3_proposalHealth =
+    static let branchB_step3_proposalHealth =
         "Easiest first thing to track: sleep hours, 7-day average. I'll average whatever you tell me. Want it?"
 
-    public static let branchB_step3_proposalMoney =
+    static let branchB_step3_proposalMoney =
         "Easiest first thing to track: a weekly discretionary spending tally. Give me a number if you want a limit, or skip and I'll just keep a running total. Want it?"
 
-    public static let branchB_step3_proposalHome =
+    static let branchB_step3_proposalHome =
         "Easiest first thing: a 3-item daily room reset — say what the three items are when you want to do it. Want it?"
 
-    public static let branchB_step3_proposalHobbies =
+    static let branchB_step3_proposalHobbies =
         "Easiest first thing: a weekly 'what did I actually touch' log. No targets — just somewhere it lives. Want it?"
 
-    public static let branchB_step3_proposalSocial =
+    static let branchB_step3_proposalSocial =
         "Easiest first thing: a small weekly target — like 'reach out to one person.' Want it?"
 
     /// §4.4 — the three branch responses.
-    public static let branchB_step4_afterYes = "Added."
-    public static let branchB_step4_afterDifferent =
+    static let branchB_step4_afterYes = "Added."
+    static let branchB_step4_afterDifferent =
         "Cool — describe what you'd want instead in your own words. Rough is fine."
-    public static let branchB_step4_afterSkip =
+    static let branchB_step4_afterSkip =
         "Cool, the team's there without it. We can add later."
 
     /// §4.5 — second-instrument prompt. Verbatim from UXR v2 §4.5.
     /// (Source-split across two literals so the project-wide deslop
     /// regex doesn't false-positive on the verbatim phrase "for n" + "ow";
     /// compiler folds at compile time, runtime string is byte-identical.)
-    public static let branchB_step5_secondInstrumentPrompt =
+    static let branchB_step5_secondInstrumentPrompt =
         "Want to add a second one, or are we good for n" + "ow?"
 
     /// §4.6 B6 — cadence proposal. Verbatim.
-    public static let branchB_step6_cadenceProposal =
+    static let branchB_step6_cadenceProposal =
         "I'll send a quiet morning brief at 7am tomorrow and a wind-down nudge tonight at 10:30. Sound right?"
 
-    public static let branchB_step6_skipNudgesAck =
+    static let branchB_step6_skipNudgesAck =
         "Cool. You can ask me to set one up anytime."
 
     /// §4.7 B7 — script exit. Verbatim.
-    public static let branchB_step7_exit =
+    static let branchB_step7_exit =
         "Done. You can tell me anything now — log an event, ask how something's going, or just talk. I'll be here."
 
     // MARK: - §5 Branch C — monosyllabic / unclear
 
     /// §5.1 C1 — verbatim on-ramp.
-    public static let branchC_step1_onRamp = """
+    static let branchC_step1_onRamp = """
         No worries. Easiest start: tell me one thing about today. How'd you sleep, or what \
         did you have for breakfast? I'll just log it — no commitment to anything.
         """
 
     /// §5.1 follow-up after still-vague second answer. Verbatim.
-    public static let branchC_step1_vagueExit =
+    static let branchC_step1_vagueExit =
         "Cool, no rush. I'll be here when something comes up. You can also tap the mic and just talk if typing's annoying."
 
     // MARK: - Assembly helpers used by PromptAssembler
@@ -163,7 +163,7 @@ public enum CoordinatorEmptyStateCopy {
     /// segment when in empty-state. The block lists every template the
     /// coordinator may need for the active branch + state, so the LLM
     /// has the verbatim copy at hand without having to invent it.
-    public static func runtimeContextBlock(
+    static func runtimeContextBlock(
         branch: EmptyStateBranch,
         state: ConversationState,
         nowLocalHour: Int

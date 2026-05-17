@@ -19,21 +19,21 @@ import Foundation
 import FoundationModels
 #endif
 
-public struct LLMBackendResolution: Sendable {
-    public let factory: any LLMSessionFactory
-    public let kind: LLMBackendKind
+struct LLMBackendResolution: Sendable {
+    let factory: any LLMSessionFactory
+    let kind: LLMBackendKind
 
-    public init(factory: any LLMSessionFactory, kind: LLMBackendKind) {
+    init(factory: any LLMSessionFactory, kind: LLMBackendKind) {
         self.factory = factory
         self.kind = kind
     }
 }
 
-public enum LLMResolver {
+enum LLMResolver {
     /// Returns the best available backend. Never throws — falls back to
     /// MockLLMSession with a typed reason so the UI can render a precise
     /// banner per §1.10.
-    public static func resolve() async -> LLMBackendResolution {
+    static func resolve() async -> LLMBackendResolution {
         #if canImport(FoundationModels)
         if #available(iOS 26.0, *) {
             let available = SystemLanguageModel.default.isAvailable

@@ -29,95 +29,95 @@ import GRDB
 // `static func generate()` returns a UUID-shaped ID. Tools that need a
 // lex-ordered ULID call `ULID.generate(now:)` and wrap with `init(rawValue:)`.
 
-public struct ActionID: Hashable, Codable, Sendable, RawRepresentable, ExpressibleByStringLiteral, CustomStringConvertible {
-    public let rawValue: String
-    public init(rawValue: String) { self.rawValue = rawValue }
-    public init(_ rawValue: String) { self.rawValue = rawValue }
-    public init(stringLiteral value: String) { self.rawValue = value }
+struct ActionID: Hashable, Codable, Sendable, RawRepresentable, ExpressibleByStringLiteral, CustomStringConvertible {
+    let rawValue: String
+    init(rawValue: String) { self.rawValue = rawValue }
+    init(_ rawValue: String) { self.rawValue = rawValue }
+    init(stringLiteral value: String) { self.rawValue = value }
     /// Legacy alias — earlier code reads `id.raw`.
-    public var raw: String { rawValue }
-    public var description: String { rawValue }
-    public static func generate() -> ActionID {
+    var raw: String { rawValue }
+    var description: String { rawValue }
+    static func generate() -> ActionID {
         ActionID(rawValue: UUID().uuidString)
     }
-    public init(from decoder: Decoder) throws {
+    init(from decoder: Decoder) throws {
         self.rawValue = try decoder.singleValueContainer().decode(String.self)
     }
-    public func encode(to encoder: Encoder) throws {
+    func encode(to encoder: Encoder) throws {
         var c = encoder.singleValueContainer()
         try c.encode(rawValue)
     }
 }
 
-public struct TurnID: Hashable, Codable, Sendable, RawRepresentable, ExpressibleByStringLiteral, CustomStringConvertible {
-    public let rawValue: String
-    public init(rawValue: String) { self.rawValue = rawValue }
-    public init(_ rawValue: String) { self.rawValue = rawValue }
-    public init(stringLiteral value: String) { self.rawValue = value }
+struct TurnID: Hashable, Codable, Sendable, RawRepresentable, ExpressibleByStringLiteral, CustomStringConvertible {
+    let rawValue: String
+    init(rawValue: String) { self.rawValue = rawValue }
+    init(_ rawValue: String) { self.rawValue = rawValue }
+    init(stringLiteral value: String) { self.rawValue = value }
     /// Legacy alias — earlier code reads `id.raw`.
-    public var raw: String { rawValue }
-    public var description: String { rawValue }
-    public static func generate() -> TurnID {
+    var raw: String { rawValue }
+    var description: String { rawValue }
+    static func generate() -> TurnID {
         TurnID(rawValue: UUID().uuidString)
     }
-    public init(from decoder: Decoder) throws {
+    init(from decoder: Decoder) throws {
         self.rawValue = try decoder.singleValueContainer().decode(String.self)
     }
-    public func encode(to encoder: Encoder) throws {
+    func encode(to encoder: Encoder) throws {
         var c = encoder.singleValueContainer()
         try c.encode(rawValue)
     }
 }
 
-public struct EventID: Hashable, Codable, Sendable, RawRepresentable, ExpressibleByStringLiteral, CustomStringConvertible {
-    public let rawValue: String
-    public init(rawValue: String) { self.rawValue = rawValue }
-    public init(_ rawValue: String) { self.rawValue = rawValue }
-    public init(stringLiteral value: String) { self.rawValue = value }
-    public var raw: String { rawValue }
-    public var description: String { rawValue }
-    public static func generate() -> EventID {
+struct EventID: Hashable, Codable, Sendable, RawRepresentable, ExpressibleByStringLiteral, CustomStringConvertible {
+    let rawValue: String
+    init(rawValue: String) { self.rawValue = rawValue }
+    init(_ rawValue: String) { self.rawValue = rawValue }
+    init(stringLiteral value: String) { self.rawValue = value }
+    var raw: String { rawValue }
+    var description: String { rawValue }
+    static func generate() -> EventID {
         EventID(rawValue: UUID().uuidString)
     }
-    public init(from decoder: Decoder) throws {
+    init(from decoder: Decoder) throws {
         self.rawValue = try decoder.singleValueContainer().decode(String.self)
     }
-    public func encode(to encoder: Encoder) throws {
+    func encode(to encoder: Encoder) throws {
         var c = encoder.singleValueContainer()
         try c.encode(rawValue)
     }
 }
 
-public struct MemoryID: Hashable, Codable, Sendable, RawRepresentable, ExpressibleByStringLiteral, CustomStringConvertible {
-    public let rawValue: String
-    public init(rawValue: String) { self.rawValue = rawValue }
-    public init(_ rawValue: String) { self.rawValue = rawValue }
-    public init(stringLiteral value: String) { self.rawValue = value }
-    public var raw: String { rawValue }
-    public var description: String { rawValue }
-    public init(from decoder: Decoder) throws {
+struct MemoryID: Hashable, Codable, Sendable, RawRepresentable, ExpressibleByStringLiteral, CustomStringConvertible {
+    let rawValue: String
+    init(rawValue: String) { self.rawValue = rawValue }
+    init(_ rawValue: String) { self.rawValue = rawValue }
+    init(stringLiteral value: String) { self.rawValue = value }
+    var raw: String { rawValue }
+    var description: String { rawValue }
+    init(from decoder: Decoder) throws {
         self.rawValue = try decoder.singleValueContainer().decode(String.self)
     }
-    public func encode(to encoder: Encoder) throws {
+    func encode(to encoder: Encoder) throws {
         var c = encoder.singleValueContainer()
         try c.encode(rawValue)
     }
 }
 
-public struct NotificationID: Hashable, Codable, Sendable, RawRepresentable, ExpressibleByStringLiteral, CustomStringConvertible {
-    public let rawValue: String
-    public init(rawValue: String) { self.rawValue = rawValue }
-    public init(_ rawValue: String) { self.rawValue = rawValue }
-    public init(stringLiteral value: String) { self.rawValue = value }
-    public var raw: String { rawValue }
-    public var description: String { rawValue }
-    public static func generate() -> NotificationID {
+struct NotificationID: Hashable, Codable, Sendable, RawRepresentable, ExpressibleByStringLiteral, CustomStringConvertible {
+    let rawValue: String
+    init(rawValue: String) { self.rawValue = rawValue }
+    init(_ rawValue: String) { self.rawValue = rawValue }
+    init(stringLiteral value: String) { self.rawValue = value }
+    var raw: String { rawValue }
+    var description: String { rawValue }
+    static func generate() -> NotificationID {
         NotificationID(rawValue: UUID().uuidString)
     }
-    public init(from decoder: Decoder) throws {
+    init(from decoder: Decoder) throws {
         self.rawValue = try decoder.singleValueContainer().decode(String.self)
     }
-    public func encode(to encoder: Encoder) throws {
+    func encode(to encoder: Encoder) throws {
         var c = encoder.singleValueContainer()
         try c.encode(rawValue)
     }
@@ -125,34 +125,34 @@ public struct NotificationID: Hashable, Codable, Sendable, RawRepresentable, Exp
 
 /// Stable instrument primary-key wrapper. Callers generate fresh
 /// IDs via `ULID.generate(now:)` and wrap them with `init(rawValue:)`.
-public struct InstrumentID: Hashable, Codable, Sendable, RawRepresentable, ExpressibleByStringLiteral, CustomStringConvertible {
-    public let rawValue: String
-    public init(rawValue: String) { self.rawValue = rawValue }
-    public init(_ rawValue: String) { self.rawValue = rawValue }
-    public init(stringLiteral value: String) { self.rawValue = value }
-    public var raw: String { rawValue }
-    public var description: String { rawValue }
-    public init(from decoder: Decoder) throws {
+struct InstrumentID: Hashable, Codable, Sendable, RawRepresentable, ExpressibleByStringLiteral, CustomStringConvertible {
+    let rawValue: String
+    init(rawValue: String) { self.rawValue = rawValue }
+    init(_ rawValue: String) { self.rawValue = rawValue }
+    init(stringLiteral value: String) { self.rawValue = value }
+    var raw: String { rawValue }
+    var description: String { rawValue }
+    init(from decoder: Decoder) throws {
         self.rawValue = try decoder.singleValueContainer().decode(String.self)
     }
-    public func encode(to encoder: Encoder) throws {
+    func encode(to encoder: Encoder) throws {
         var c = encoder.singleValueContainer()
         try c.encode(rawValue)
     }
 }
 
 /// Commitment primary key. Mirrors InstrumentID's contract.
-public struct CommitmentID: Hashable, Codable, Sendable, RawRepresentable, ExpressibleByStringLiteral, CustomStringConvertible {
-    public let rawValue: String
-    public init(rawValue: String) { self.rawValue = rawValue }
-    public init(_ rawValue: String) { self.rawValue = rawValue }
-    public init(stringLiteral value: String) { self.rawValue = value }
-    public var raw: String { rawValue }
-    public var description: String { rawValue }
-    public init(from decoder: Decoder) throws {
+struct CommitmentID: Hashable, Codable, Sendable, RawRepresentable, ExpressibleByStringLiteral, CustomStringConvertible {
+    let rawValue: String
+    init(rawValue: String) { self.rawValue = rawValue }
+    init(_ rawValue: String) { self.rawValue = rawValue }
+    init(stringLiteral value: String) { self.rawValue = value }
+    var raw: String { rawValue }
+    var description: String { rawValue }
+    init(from decoder: Decoder) throws {
         self.rawValue = try decoder.singleValueContainer().decode(String.self)
     }
-    public func encode(to encoder: Encoder) throws {
+    func encode(to encoder: Encoder) throws {
         var c = encoder.singleValueContainer()
         try c.encode(rawValue)
     }
@@ -166,44 +166,44 @@ public struct CommitmentID: Hashable, Codable, Sendable, RawRepresentable, Expre
 // across GRDB minor releases.
 
 extension ActionID: DatabaseValueConvertible {
-    public var databaseValue: DatabaseValue { rawValue.databaseValue }
-    public static func fromDatabaseValue(_ dbValue: DatabaseValue) -> ActionID? {
+    var databaseValue: DatabaseValue { rawValue.databaseValue }
+    static func fromDatabaseValue(_ dbValue: DatabaseValue) -> ActionID? {
         String.fromDatabaseValue(dbValue).map { ActionID(rawValue: $0) }
     }
 }
 extension TurnID: DatabaseValueConvertible {
-    public var databaseValue: DatabaseValue { rawValue.databaseValue }
-    public static func fromDatabaseValue(_ dbValue: DatabaseValue) -> TurnID? {
+    var databaseValue: DatabaseValue { rawValue.databaseValue }
+    static func fromDatabaseValue(_ dbValue: DatabaseValue) -> TurnID? {
         String.fromDatabaseValue(dbValue).map { TurnID(rawValue: $0) }
     }
 }
 extension EventID: DatabaseValueConvertible {
-    public var databaseValue: DatabaseValue { rawValue.databaseValue }
-    public static func fromDatabaseValue(_ dbValue: DatabaseValue) -> EventID? {
+    var databaseValue: DatabaseValue { rawValue.databaseValue }
+    static func fromDatabaseValue(_ dbValue: DatabaseValue) -> EventID? {
         String.fromDatabaseValue(dbValue).map { EventID(rawValue: $0) }
     }
 }
 extension MemoryID: DatabaseValueConvertible {
-    public var databaseValue: DatabaseValue { rawValue.databaseValue }
-    public static func fromDatabaseValue(_ dbValue: DatabaseValue) -> MemoryID? {
+    var databaseValue: DatabaseValue { rawValue.databaseValue }
+    static func fromDatabaseValue(_ dbValue: DatabaseValue) -> MemoryID? {
         String.fromDatabaseValue(dbValue).map { MemoryID(rawValue: $0) }
     }
 }
 extension NotificationID: DatabaseValueConvertible {
-    public var databaseValue: DatabaseValue { rawValue.databaseValue }
-    public static func fromDatabaseValue(_ dbValue: DatabaseValue) -> NotificationID? {
+    var databaseValue: DatabaseValue { rawValue.databaseValue }
+    static func fromDatabaseValue(_ dbValue: DatabaseValue) -> NotificationID? {
         String.fromDatabaseValue(dbValue).map { NotificationID(rawValue: $0) }
     }
 }
 extension InstrumentID: DatabaseValueConvertible {
-    public var databaseValue: DatabaseValue { rawValue.databaseValue }
-    public static func fromDatabaseValue(_ dbValue: DatabaseValue) -> InstrumentID? {
+    var databaseValue: DatabaseValue { rawValue.databaseValue }
+    static func fromDatabaseValue(_ dbValue: DatabaseValue) -> InstrumentID? {
         String.fromDatabaseValue(dbValue).map { InstrumentID(rawValue: $0) }
     }
 }
 extension CommitmentID: DatabaseValueConvertible {
-    public var databaseValue: DatabaseValue { rawValue.databaseValue }
-    public static func fromDatabaseValue(_ dbValue: DatabaseValue) -> CommitmentID? {
+    var databaseValue: DatabaseValue { rawValue.databaseValue }
+    static func fromDatabaseValue(_ dbValue: DatabaseValue) -> CommitmentID? {
         String.fromDatabaseValue(dbValue).map { CommitmentID(rawValue: $0) }
     }
 }

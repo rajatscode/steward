@@ -30,20 +30,20 @@ import Foundation
 /// Wraps the mutable `TurnBudget` so the agent.handoff tool (which runs
 /// inside the LLM's tool-call auto-loop) and `AgentLoop` (which spawns
 /// it) can share a single counter without races.
-public actor SharedBudget {
-    public private(set) var budget: TurnBudget
+actor SharedBudget {
+    private(set) var budget: TurnBudget
 
-    public init(budget: TurnBudget) {
+    init(budget: TurnBudget) {
         self.budget = budget
     }
 
-    public func consumeHandoff() throws {
+    func consumeHandoff() throws {
         try budget.consumeHandoff()
     }
 
-    public func snapshot() -> TurnBudget { budget }
-    public var handoffsRemaining: Int { budget.handoffsRemaining }
-    public var handoffsConsumed: Int {
+    func snapshot() -> TurnBudget { budget }
+    var handoffsRemaining: Int { budget.handoffsRemaining }
+    var handoffsConsumed: Int {
         TurnBudget.defaultHandoffs - budget.handoffsRemaining
     }
 }
@@ -59,12 +59,12 @@ public actor SharedBudget {
 /// Production default: `SettingsStore.shared`. Tests inject a closure
 /// that returns whatever shape they're asserting on, without having
 /// to stand up a real DB.
-public typealias RuntimeSettingsReader = @Sendable (_ now: Date) async -> (mercy: MercyMode, pauseUntil: Date?)
+typealias RuntimeSettingsReader = @Sendable (_ now: Date) async -> (mercy: MercyMode, pauseUntil: Date?)
 
 /// Default reader that consults `SettingsStore.shared`. Treats a past
 /// `mercyModeUntil` / `pauseUntil` as expired (off / nil).
 @Sendable
-public func defaultRuntimeSettingsReader(now: Date) async -> (mercy: MercyMode, pauseUntil: Date?) {
+func defaultRuntimeSettingsReader(now: Date) async -> (mercy: MercyMode, pauseUntil: Date?) {
     let settings = try? await SettingsStore.shared.load()
     let mercy: MercyMode
     if let until = settings?.mercyModeUntil, until > now {
@@ -87,27 +87,27 @@ public func defaultRuntimeSettingsReader(now: Date) async -> (mercy: MercyMode, 
 /// own the canonical `domains` table reader; for v0.9 AgentLoop ships
 /// with a closure-based resolver so tests can inject fixtures and the real
 /// app wires in a DB-backed implementation.
-public protocol DomainAgentResolver: Sendable {
+protocol DomainAgentResolver: Sendable {
     func resolve(domain: String) async -> DomainAgent?
     func listActive() async -> [DomainSummary]
 }
 
-public struct FixtureDomainAgentResolver: DomainAgentResolver {
+struct FixtureDomainAgentResolver: DomainAgentResolver {
     private let byID: [String: DomainAgent]
-    public init(domains: [DomainAgent]) {
+    init(domains: [DomainAgent]) {
         self.byID = Dictionary(
             uniqueKeysWithValues: domains.map { ($0.domain, $0) }
         )
     }
-    public func resolve(domain: String) async -> DomainAgent? { byID[domain] }
-    public func listActive() async -> [DomainSummary] {
+    func resolve(domain: String) async -> DomainAgent? { byID[domain] }
+    func listActive() async -> [DomainSummary] {
         byID.values.map { DomainSummary(domain: $0.domain, displayName: $0.displayName) }
     }
 }
 
 // MARK: - Agent loop
 
-public actor AgentLoop {
+actor AgentLoop {
     private let factory: any LLMSessionFactory
     private let registry: any ToolRegistry
     private let coordinator: CoordinatorAgent
@@ -122,7 +122,7 @@ public actor AgentLoop {
     /// `initialState` init arg.
     private var conversationState: ConversationState
 
-    public init(
+    init(
         factory: any LLMSessionFactory,
         registry: any ToolRegistry,
         coordinator: CoordinatorAgent = CoordinatorAgent(),
@@ -149,7 +149,7 @@ public actor AgentLoop {
     /// Run one user turn through the coordinator. Throws on session-level
     /// failures; returns a typed `CoordinatorResponse` for all in-band
     /// outcomes (including handoff-budget exhaustion).
-    public func run(userMessage: String) async throws -> CoordinatorResponse {
+    func run(userMessage: String) async throws -> CoordinatorResponse {
         let turnID = TurnID(rawValue: turnIDGen())
         let now = clock()
         let activeDomains = await resolver.listActive()
@@ -355,7 +355,7 @@ public actor AgentLoop {
 
     /// Tests + the UI's chat-replay path read the current state to render
     /// the right input prompt / chip set.
-    public func currentConversationState() -> ConversationState {
+    func currentConversationState() -> ConversationState {
         return conversationState
     }
 }
@@ -366,10 +366,10 @@ public actor AgentLoop {
 /// domain agent session, returns the domain reply to the coordinator
 /// session as JSON. Foundation Models then auto-continues with that
 /// reply available.
-public struct AgentHandoffTool: LLMTool {
-    public let id: String = ToolID.agentHandoff.rawValue
-    public let description: String = "Hand off to a domain agent. Counts one budget hop per call. Args: {domain: string, message: string}."
-    public let jsonSchemaForArgs: String = """
+struct AgentHandoffTool: LLMTool {
+    let id: String = ToolID.agentHandoff.rawValue
+    let description: String = "Hand off to a domain agent. Counts one budget hop per call. Args: {domain: string, message: string}."
+    let jsonSchemaForArgs: String = """
         {
           "type": "object",
           "properties": {
@@ -389,7 +389,7 @@ public struct AgentHandoffTool: LLMTool {
     let clock: @Sendable () -> Date
     let settingsReader: RuntimeSettingsReader
 
-    public init(
+    init(
         budget: SharedBudget,
         resolver: any DomainAgentResolver,
         registry: any ToolRegistry,
@@ -409,7 +409,7 @@ public struct AgentHandoffTool: LLMTool {
         self.settingsReader = settingsReader
     }
 
-    public func invoke(argsJSON: String) async throws -> String {
+    func invoke(argsJSON: String) async throws -> String {
         // Parse args defensively — malformed JSON → structured error
         // back to the LLM (never throw fatal).
         let args: HandoffArgs

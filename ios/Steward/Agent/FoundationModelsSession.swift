@@ -21,12 +21,12 @@ import Foundation
 import FoundationModels
 
 @available(iOS 26.0, *)
-public struct FoundationModelsSessionFactory: LLMSessionFactory {
-    public let backendKind: LLMBackendKind = .foundationModels
+struct FoundationModelsSessionFactory: LLMSessionFactory {
+    let backendKind: LLMBackendKind = .foundationModels
 
-    public init() {}
+    init() {}
 
-    public func makeSession(
+    func makeSession(
         systemPrompt: String,
         tools: [any LLMTool],
         temperature: Double
@@ -106,13 +106,13 @@ private struct FMToolAdapter: Tool {
 }
 
 @available(iOS 26.0, *)
-public actor FoundationModelsSession: LLMSession {
+actor FoundationModelsSession: LLMSession {
     private var session: LanguageModelSession
     private let toolMap: [String: any LLMTool]
     private let backendKind: LLMBackendKind = .foundationModels
     private let permissionSink: PermissionSignalSink
 
-    public init(
+    init(
         systemPrompt: String,
         tools: [any LLMTool],
         temperature: Double
@@ -131,7 +131,7 @@ public actor FoundationModelsSession: LLMSession {
         )
     }
 
-    public func respond(to userMessage: String) async throws -> LLMResponse {
+    func respond(to userMessage: String) async throws -> LLMResponse {
         // Foundation Models auto-loops tool calls within this single call.
         // We never manually loop (§4 hard reject #7). On return, the
         // transcript carries every tool invocation the framework ran.
@@ -172,7 +172,7 @@ public actor FoundationModelsSession: LLMSession {
         }
     }
 
-    public func reset() async {
+    func reset() async {
         // Recreate the underlying session. The instructions and tools are
         // captured in this actor's init args via the adapters dictionary,
         // but we can't reconstruct without storing them. KV-cache bounding

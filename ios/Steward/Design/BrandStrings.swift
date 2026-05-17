@@ -10,13 +10,13 @@ import Foundation
 // throughout the app still say "Outkeep" inline (so the rename is searchable
 // in greps and grep-on-pull-request); future copy should prefer `BrandStrings`
 // for new surfaces so a future re-brand is a one-line change.
-public enum BrandStrings {
+enum BrandStrings {
 
     /// Product name as it appears to the user — home-screen icon label, nav
     /// titles, notification titles, audit-log persona, in-chat persona, etc.
-    public static let appName = "Outkeep"
+    static let appName = "Outkeep"
 
     /// Brand motto. Keep the period; it's a statement, not a tagline shout.
     /// Use Satoshi-Bold on display surfaces (splash, About).
-    public static let motto = "Structure your life. Make better choices."
+    static let motto = "Structure your life. Make better choices."
 }

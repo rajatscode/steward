@@ -22,7 +22,7 @@ import Foundation
 
 /// Why the mic button is unavailable. Each case maps to a piece of UI copy
 /// from `design/ui-specs.md` §1.6.
-public enum VoiceAvailability: Sendable, Equatable {
+enum VoiceAvailability: Sendable, Equatable {
     case ready
     case notLoaded          // WhisperKit failed to load, or still initializing.
     case permissionDenied   // User declined microphone access.
@@ -32,7 +32,7 @@ public enum VoiceAvailability: Sendable, Equatable {
 /// Minimal voice-capture surface the UI binds against. The
 /// `VoiceCaptureAdapter` wraps `VoiceCaptureService.shared`; tests can
 /// substitute `MissingVoiceCapture` for a deterministic disabled mic.
-public protocol VoiceCapture: AnyObject, Sendable {
+protocol VoiceCapture: AnyObject, Sendable {
     var availability: VoiceAvailability { get async }
 
     /// Begin recording on press-down. Errors are surfaced via the next
@@ -55,26 +55,26 @@ public protocol VoiceCapture: AnyObject, Sendable {
 /// `VoiceCaptureService.shared.initializeIfNeeded()` returns. Reads from
 /// main-thread UI code go through this `@MainActor` enum.
 @MainActor
-public enum VoiceCaptureRegistry {
-    public static var current: any VoiceCapture = MissingVoiceCapture()
+enum VoiceCaptureRegistry {
+    static var current: any VoiceCapture = MissingVoiceCapture()
 }
 
 /// Reports `.notLoaded` and refuses to record. Used as the registry's
 /// startup-time default before the WhisperKit-backed adapter is installed,
 /// and as a test stand-in for the disabled-mic state.
-public final class MissingVoiceCapture: VoiceCapture {
-    public init() {}
-    public var availability: VoiceAvailability { get async { .notLoaded } }
-    public func beginRecording() async {}
-    public func endRecordingAndTranscribe() async throws -> String? { nil }
-    public func cancelRecording() async {}
+final class MissingVoiceCapture: VoiceCapture {
+    init() {}
+    var availability: VoiceAvailability { get async { .notLoaded } }
+    func beginRecording() async {}
+    func endRecordingAndTranscribe() async throws -> String? { nil }
+    func cancelRecording() async {}
 }
 
 /// Posted when `VoiceCaptureRegistry.current` is reassigned (after
 /// WhisperKit eager init completes) or when the service's readiness
 /// changes in a way the UI should reflect. ChatView observes this to
 /// flip the mic button from disabled-with-tooltip to active.
-public extension Notification.Name {
+extension Notification.Name {
     static let voiceCaptureReadinessChanged = Notification.Name(
         "Steward.voiceCaptureReadinessChanged"
     )

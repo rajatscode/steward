@@ -24,30 +24,30 @@
 
 import Foundation
 
-public struct AssembledPrompt: Sendable, Equatable {
-    public let text: String
-    public let segments: [Segment]
+struct AssembledPrompt: Sendable, Equatable {
+    let text: String
+    let segments: [Segment]
 
     /// Indices of the two invariant blocks. Tests assert
     /// `invariantIndices.first == 1` and `invariantIndices.last ==
     /// segments.count - 1`.
-    public let invariantIndices: [Int]
+    let invariantIndices: [Int]
 
-    public struct Segment: Sendable, Equatable {
-        public let label: String
-        public let body: String
-        public let isInvariant: Bool
+    struct Segment: Sendable, Equatable {
+        let label: String
+        let body: String
+        let isInvariant: Bool
     }
 }
 
-public struct PromptAssembler: Sendable {
-    public let toolCatalog: [ToolID: String]
+struct PromptAssembler: Sendable {
+    let toolCatalog: [ToolID: String]
 
-    public init(toolCatalog: [ToolID: String] = PromptAssembler.defaultToolDescriptions) {
+    init(toolCatalog: [ToolID: String] = PromptAssembler.defaultToolDescriptions) {
         self.toolCatalog = toolCatalog
     }
 
-    public func assemble(
+    func assemble(
         for role: AgentRole,
         runtime: RuntimeContext,
         scope: ToolScope
@@ -308,7 +308,7 @@ public struct PromptAssembler: Sendable {
 // MARK: - Default tool descriptions (concise, no example outputs)
 
 extension PromptAssembler {
-    public static let defaultToolDescriptions: [ToolID: String] = [
+    static let defaultToolDescriptions: [ToolID: String] = [
         .eventCapture: "Log a freeform event. Args: text, domain?, kind?, payload?.",
         .eventList: "List recent events. Args: domain?, since?, limit?.",
         .eventRecentSummary: "Natural-language summary of recent events.",

@@ -25,8 +25,8 @@ import Foundation
 
 /// One process-wide host so the UI never re-builds the registry. The actor
 /// serializes the "set up everything" phase exactly once.
-public actor AgentLoopHost {
-    public static let shared = AgentLoopHost()
+actor AgentLoopHost {
+    static let shared = AgentLoopHost()
 
     private enum State {
         case unset
@@ -34,15 +34,15 @@ public actor AgentLoopHost {
         case ready(Ready)
     }
 
-    public struct Ready: Sendable {
-        public let loop: AgentLoop
-        public let backendKind: LLMBackendKind
+    struct Ready: Sendable {
+        let loop: AgentLoop
+        let backendKind: LLMBackendKind
         /// Registry handle so the chat UI can re-fire a single tool call
         /// after an inline permission grant (addendum §1.9 — "auto-retries
         /// the original tool call once"). Exposed here, not on AgentLoop,
         /// because the retry path does NOT consume a turn budget hop and
         /// does NOT go through the LLM at all.
-        public let toolRegistry: any ToolRegistry
+        let toolRegistry: any ToolRegistry
     }
 
     private var state: State = .unset
@@ -52,7 +52,7 @@ public actor AgentLoopHost {
     /// Resolves the loop, building it on first call. Multiple concurrent
     /// callers wait on a single Task so the registry only gets populated
     /// once.
-    public func ready() async throws -> Ready {
+    func ready() async throws -> Ready {
         switch state {
         case .ready(let r):
             return r
@@ -74,7 +74,7 @@ public actor AgentLoopHost {
 
     /// Settings-tab "About" surface reads this directly so the FM-status row
     /// re-renders without a chat round-trip.
-    public func currentBackendKind() async -> LLMBackendKind? {
+    func currentBackendKind() async -> LLMBackendKind? {
         if case .ready(let r) = state { return r.backendKind }
         return nil
     }
@@ -85,7 +85,7 @@ public actor AgentLoopHost {
     /// the same signal again if the user actually denied access at the OS
     /// sheet, or any other tool error otherwise. The chat UI is responsible
     /// for the "retry once" contract — this method itself does not loop.
-    public func retryToolCall(toolID: String, argsJSON: String) async throws -> String {
+    func retryToolCall(toolID: String, argsJSON: String) async throws -> String {
         let ready = try await ready()
         guard let typed = ToolID(rawValue: toolID),
               let tool = await ready.toolRegistry.tool(for: typed) else {
