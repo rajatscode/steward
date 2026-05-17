@@ -55,6 +55,12 @@ final class AppBootstrap: ObservableObject {
         InstrumentRegistry.bootstrapAll()
         do {
             _ = try await DatabaseProvider.shared.database()
+
+            // Track F bootstrap: CSV mirror + network-driven sync + voice eager init.
+            // All best-effort — voice failing (no model) or iCloud unavailable
+            // must not block the app from opening.
+            await TrackFBootstrap.run()
+
             phase = .ready
         } catch {
             phase = .failed(message: String(describing: error))
@@ -70,5 +76,83 @@ final class AppBootstrap: ObservableObject {
         Task.detached {
             _ = try? await AgentLoopHost.shared.ready()
         }
+    }
+}
+
+/// Track F bootstrap. Resolves the iCloud Drive container (falling back to
+/// app-support if unavailable), wires the CSVMirrorWatcher into the tools
+/// façade, kicks off the NWPathMonitor that drains the sync queue, and
+/// schedules the WhisperKit eager-init off the main actor so the first
+/// hold-to-talk tap feels instant.
+enum TrackFBootstrap {
+    static func run() async {
+        // 0. Wire each registered InstrumentKind into the CSV mirror via the
+        //    InstrumentCSVCoder adapter. Pod C's InstrumentRegistry.bootstrapAll()
+        //    runs above us in AppBootstrap.start (line 55), so by this point
+        //    all 7 kinds are registered with the typed registry and we just
+        //    need to plug their renderCSV/parseCSVOverride into our CSV
+        //    coder registry.
+        await registerKindCoders()
+
+        // 1. Load settings to honor csv_mirror_enabled / icloud_drive_folder.
+        let settings: Settings
+        do {
+            settings = try await SettingsStore.shared.load()
+        } catch {
+            return // bootstrap is best-effort
+        }
+
+        // 2. Pick a CSV mirror root. Prefer the iCloud ubiquity container; if
+        //    iCloud Drive isn't enabled, fall back to Application Support so
+        //    the user still gets a working in-app surface.
+        if settings.csvMirrorEnabled {
+            let root: CSVMirrorRoot
+            if FileManager.default.url(forUbiquityContainerIdentifier: "iCloud.com.rajatscode.steward") != nil {
+                root = .ubiquityContainer(
+                    identifier: "iCloud.com.rajatscode.steward",
+                    subfolder: settings.icloudDriveFolder
+                )
+            } else {
+                root = .applicationSupport(subfolder: settings.icloudDriveFolder)
+            }
+            if let paths = try? CSVMirrorPaths.resolve(root) {
+                let watcher = CSVMirrorWatcher(paths: paths)
+                try? await watcher.startWatching()
+                await CSVMirrorTools.shared.configure(watcher: watcher)
+            }
+        }
+
+        // 3. Network observer drains the sync queue when path becomes satisfied.
+        await NetworkObserverBootstrap.wireCSVDrain()
+
+        // 4. Voice eager init. Detached so the model load (potentially
+        //    multi-hundred MB) doesn't slow first paint. The service no-ops
+        //    if voice is disabled in settings.
+        Task.detached(priority: .utility) {
+            await VoiceCaptureService.shared.initializeIfNeeded()
+        }
+    }
+
+    /// Register one `InstrumentCSVCoder` per Pod C kind. Adding a kind is
+    /// one line here + one line in `InstrumentRegistry.bootstrapAll()`.
+    /// Both lists are kept in sync — if Pod C adds an 8th kind, this method
+    /// gets one more line and that's it. No string-keyed dispatch anywhere
+    /// (hard reject #9 still holds; the registry is the single dispatch site).
+    static func registerKindCoders() async {
+        let registry = InstrumentCSVCoderRegistry.shared
+        await registry.register(kindID: RunningAccumulator.id,
+                                coder: InstrumentCSVCoder(kind: RunningAccumulator.self))
+        await registry.register(kindID: BoundedBudget.id,
+                                coder: InstrumentCSVCoder(kind: BoundedBudget.self))
+        await registry.register(kindID: RollingAverage.id,
+                                coder: InstrumentCSVCoder(kind: RollingAverage.self))
+        await registry.register(kindID: CountdownCommitment.id,
+                                coder: InstrumentCSVCoder(kind: CountdownCommitment.self))
+        await registry.register(kindID: WeeklyEvidenceLog.id,
+                                coder: InstrumentCSVCoder(kind: WeeklyEvidenceLog.self))
+        await registry.register(kindID: Checklist.id,
+                                coder: InstrumentCSVCoder(kind: Checklist.self))
+        await registry.register(kindID: BoundedWindow.id,
+                                coder: InstrumentCSVCoder(kind: BoundedWindow.self))
     }
 }
