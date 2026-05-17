@@ -10,7 +10,10 @@ import SwiftUI
 
 struct TimingSection: View {
     let settings: Settings?
-    var onMutate: (@escaping @Sendable (inout Settings) -> Void) -> Void
+    /// Callback shape: `(audited-field, mutate)`. SettingsView routes this
+    /// to `SettingsViewModel.update(audit:_:)` so every user-driven change
+    /// emits a `settings_change` audit event (v1.1 patch).
+    var onMutate: (SettingsAuditField, @escaping @Sendable (inout Settings) -> Void) -> Void
 
     var body: some View {
         Section("TIMING") {
@@ -18,7 +21,7 @@ struct TimingSection: View {
                 MorningBriefTimePicker(
                     initial: settings?.morningBriefTime ?? "07:00",
                     onSave: { newValue in
-                        onMutate { $0.morningBriefTime = newValue }
+                        onMutate(.morningBriefTime) { $0.morningBriefTime = newValue }
                     }
                 )
             } label: {
@@ -29,7 +32,7 @@ struct TimingSection: View {
                 QuietHoursPicker(
                     initial: settings?.quietHours ?? Settings.QuietHours(start: "22:00", end: "05:00"),
                     onSave: { newValue in
-                        onMutate { $0.quietHours = newValue }
+                        onMutate(.quietHours) { $0.quietHours = newValue }
                     }
                 )
             } label: {
@@ -48,7 +51,9 @@ struct TimingSection: View {
                     initial: settings?.maxProactiveNotificationsPerDay ?? 3,
                     step: 1,
                     onSave: { newValue in
-                        onMutate { $0.maxProactiveNotificationsPerDay = newValue }
+                        onMutate(.maxProactiveNotificationsPerDay) {
+                            $0.maxProactiveNotificationsPerDay = newValue
+                        }
                     }
                 )
             } label: {
@@ -67,7 +72,9 @@ struct TimingSection: View {
                     initial: settings?.minNotificationGapMinutes ?? 90,
                     step: 15,
                     onSave: { newValue in
-                        onMutate { $0.minNotificationGapMinutes = newValue }
+                        onMutate(.minNotificationGapMinutes) {
+                            $0.minNotificationGapMinutes = newValue
+                        }
                     }
                 )
             } label: {

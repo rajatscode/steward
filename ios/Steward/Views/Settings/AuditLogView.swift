@@ -64,6 +64,13 @@ final class AuditLogViewModel: ObservableObject {
         ToolID.mercyModeEngage.rawValue,
         ToolID.pauseEngage.rawValue,
         ToolID.quietHoursSet.rawValue,
+        // v1.1 patch (settings-audit): user-driven UI mutations on the
+        // settings row emit `settings_change` events via
+        // `SettingsStore.update(audit:_:)`. They're NOT in the reversibleSet
+        // below — "Undo" on a settings change would dead-end ("Nothing to
+        // undo") because no InverseAction is paired; users can just flip the
+        // toggle back.
+        "settings_change",
     ]
 
     private let provider: DatabaseProvider
@@ -185,7 +192,69 @@ final class AuditLogViewModel: ObservableObject {
 
     private func makeSummary(text: String?, kind: String, domain: String?, payloadJSON: String?) -> String {
         if let text, !text.isEmpty { return text }
+        if kind == "settings_change",
+           let payloadJSON,
+           let s = Self.formatSettingsChange(payloadJSON: payloadJSON) {
+            return s
+        }
         return kind.replacingOccurrences(of: "_", with: " ")
+    }
+
+    /// Render a `settings_change` payload as a user-readable single line.
+    /// Expects the shape written by `SettingsStore.update(audit:_:)`:
+    /// `{"field": "...", "prior": ..., "new": ...}`. Returns nil if the
+    /// payload is malformed (caller falls back to the kind-string).
+    static func formatSettingsChange(payloadJSON: String) -> String? {
+        guard let data = payloadJSON.data(using: .utf8),
+              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let field = obj["field"] as? String
+        else { return nil }
+        let newValue: Any = obj["new"] ?? NSNull()
+        let isNull = newValue is NSNull
+
+        switch field {
+        case "mercy_mode_until":
+            if isNull { return "Mercy mode turned off" }
+            if let s = newValue as? String { return "Mercy mode on until \(prettyDate(s))" }
+            return "Mercy mode updated"
+        case "pause_until":
+            if isNull { return "Pause turned off" }
+            if let s = newValue as? String { return "Paused until \(prettyDate(s))" }
+            return "Pause updated"
+        case "quiet_hours":
+            if let d = newValue as? [String: Any],
+               let s = d["start"] as? String,
+               let e = d["end"] as? String {
+                return "Quiet hours set to \(s) – \(e)"
+            }
+            return "Quiet hours updated"
+        case "morning_brief_time":
+            if let s = newValue as? String { return "Morning brief set to \(s)" }
+            return "Morning brief time updated"
+        case "max_proactive_notifications_per_day":
+            if let n = newValue as? Int { return "Max nudges per day set to \(n)" }
+            return "Max nudges per day updated"
+        case "min_notification_gap_minutes":
+            if let n = newValue as? Int { return "Min gap between nudges set to \(n) min" }
+            return "Min gap between nudges updated"
+        case "voice_capture_enabled":
+            if let b = newValue as? Bool { return "Voice input \(b ? "on" : "off")" }
+            return "Voice input toggled"
+        case "csv_mirror_enabled":
+            if let b = newValue as? Bool { return "iCloud Drive mirror \(b ? "on" : "off")" }
+            return "iCloud Drive mirror toggled"
+        default:
+            return "Settings updated (\(field))"
+        }
+    }
+
+    private static func prettyDate(_ iso8601: String) -> String {
+        let parser = ISO8601DateFormatter()
+        guard let date = parser.date(from: iso8601) else { return iso8601 }
+        let f = DateFormatter()
+        f.dateStyle = .medium
+        f.timeStyle = .short
+        return f.string(from: date)
     }
 }
 

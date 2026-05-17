@@ -14,11 +14,11 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             Form {
-                TimingSection(settings: viewModel.settings) { mutate in
-                    Task { await viewModel.update(mutate) }
+                TimingSection(settings: viewModel.settings) { field, mutate in
+                    Task { await viewModel.update(audit: field, mutate) }
                 }
-                ModesSection(settings: viewModel.settings) { mutate in
-                    Task { await viewModel.update(mutate) }
+                ModesSection(settings: viewModel.settings) { field, mutate in
+                    Task { await viewModel.update(audit: field, mutate) }
                 }
                 LifeTeamsSection(
                     domains: viewModel.domains,
@@ -33,8 +33,8 @@ struct SettingsView: View {
                     }
                     .accessibilityIdentifier("settings.recent_actions")
                 }
-                CaptureSection(settings: viewModel.settings) { mutate in
-                    Task { await viewModel.update(mutate) }
+                CaptureSection(settings: viewModel.settings) { field, mutate in
+                    Task { await viewModel.update(audit: field, mutate) }
                 }
                 AboutSection(backendKind: viewModel.backendKind)
                 if let err = viewModel.loadError {

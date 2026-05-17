@@ -16,7 +16,10 @@ import SwiftUI
 
 struct CaptureSection: View {
     let settings: Settings?
-    var onMutate: (@escaping @Sendable (inout Settings) -> Void) -> Void
+    /// Callback shape: `(audited-field, mutate)`. SettingsView routes to
+    /// `SettingsViewModel.update(audit:_:)` so toggling voice / iCloud mirror
+    /// from the UI emits a `settings_change` audit event (v1.1 patch).
+    var onMutate: (SettingsAuditField, @escaping @Sendable (inout Settings) -> Void) -> Void
 
     /// Mirrors `CSVMirrorAvailabilityRegistry.current`. Re-keyed on the
     /// `csvMirrorAvailabilityChanged` notification so the section updates the
@@ -38,14 +41,18 @@ struct CaptureSection: View {
                     "Voice input",
                     isOn: Binding(
                         get: { settings?.voiceCaptureEnabled ?? true },
-                        set: { newValue in onMutate { $0.voiceCaptureEnabled = newValue } }
+                        set: { newValue in
+                            onMutate(.voiceCaptureEnabled) { $0.voiceCaptureEnabled = newValue }
+                        }
                     )
                 )
                 Toggle(
                     "iCloud Drive mirror",
                     isOn: Binding(
                         get: { settings?.csvMirrorEnabled ?? true },
-                        set: { newValue in onMutate { $0.csvMirrorEnabled = newValue } }
+                        set: { newValue in
+                            onMutate(.csvMirrorEnabled) { $0.csvMirrorEnabled = newValue }
+                        }
                     )
                 )
                 if settings?.csvMirrorEnabled == true,
