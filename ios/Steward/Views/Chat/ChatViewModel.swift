@@ -15,9 +15,46 @@
 //  forever after (matches Designer §1.7).
 //
 
+import EventKit
 import Foundation
 import GRDB
 import SwiftUI
+
+/// Tiny abstraction over the side-effects ChatViewModel needs for the
+/// inline permission-grant flow (addendum §1.9). Production wires this to
+/// the real `EventKitGateway` / `HealthKitGateway` and `AgentLoopHost`;
+/// tests inject a stub so the qa flow runs without touching EKEventStore /
+/// HKHealthStore. Sendable + non-isolated so the default value can be
+/// constructed from any actor context.
+protocol PermissionFlowGateway: Sendable {
+    /// Drive the OS sheet for an EventKit scope; returns the post-call
+    /// status. Wired in production to `EventKitGateway.shared.requestAccess`.
+    func requestEventKitAccess(scope: EKPermissionScope) async -> EKAuthorizationStatus
+
+    /// Drive the OS sheet for a HealthKit scope; returns the post-call
+    /// state. Wired in production to `HealthKitGateway.shared.requestAccess`.
+    func requestHealthKitAccess(scope: HealthPermissionScope) async -> HealthAuthState
+
+    /// Re-fire the original tool invocation. Wired in production to
+    /// `AgentLoopHost.shared.retryToolCall`. The retry path does NOT run
+    /// the LLM — it directly invokes the tool through the registry, so
+    /// the user sees the actual result with no extra round-trip.
+    func retryToolCall(toolID: String, argsJSON: String) async throws -> String
+}
+
+/// Production wiring. Lives at the top of the file so the default-init for
+/// `ChatViewModel` stays in one place.
+struct LivePermissionFlowGateway: PermissionFlowGateway {
+    func requestEventKitAccess(scope: EKPermissionScope) async -> EKAuthorizationStatus {
+        await EventKitGateway.shared.requestAccess(for: scope)
+    }
+    func requestHealthKitAccess(scope: HealthPermissionScope) async -> HealthAuthState {
+        await HealthKitGateway.shared.requestAccess(for: scope)
+    }
+    func retryToolCall(toolID: String, argsJSON: String) async throws -> String {
+        try await AgentLoopHost.shared.retryToolCall(toolID: toolID, argsJSON: argsJSON)
+    }
+}
 
 @MainActor
 final class ChatViewModel: ObservableObject {
@@ -37,15 +74,18 @@ final class ChatViewModel: ObservableObject {
     private let provider: DatabaseProvider
     private let domainStore: DomainStore
     private let clock: @Sendable () -> Date
+    private let permissionFlow: any PermissionFlowGateway
 
     init(
         provider: DatabaseProvider = .shared,
         domainStore: DomainStore = .shared,
-        clock: @escaping @Sendable () -> Date = { Date() }
+        clock: @escaping @Sendable () -> Date = { Date() },
+        permissionFlow: any PermissionFlowGateway = LivePermissionFlowGateway()
     ) {
         self.provider = provider
         self.domainStore = domainStore
         self.clock = clock
+        self.permissionFlow = permissionFlow
         self.placeholderText = ChatViewModel.pickPlaceholder()
     }
 
@@ -107,6 +147,16 @@ final class ChatViewModel: ObservableObject {
             // `domain.create`; the chat surface should stop showing the
             // empty-state greeting on subsequent loads.
             await refreshHistoryFlags()
+        } catch let signal as PermissionRequiredSignal {
+            // addendum §1.9 — EventKit tool asked for a permission we
+            // haven't been granted yet. Drop the thinking placeholder,
+            // surface the inline grant card. Auto-retry-once happens in
+            // `grantPermission(forMessageID:)` if the user taps Allow.
+            removeMessage(id: thinkingID)
+            handleEventKitPermissionRequired(signal: signal)
+        } catch let signal as HealthPermissionRequiredSignal {
+            removeMessage(id: thinkingID)
+            handleHealthKitPermissionRequired(signal: signal)
         } catch {
             removeMessage(id: thinkingID)
             let errorText = "Steward took too long. Saved your message — tap to retry."
@@ -118,6 +168,177 @@ final class ChatViewModel: ObservableObject {
             lastError = String(describing: error)
         }
         isSending = false
+    }
+
+    // MARK: - Permission flow (addendum §1.9)
+
+    /// Surface an EventKit permission-grant card inline. The signal carries
+    /// the original tool invocation (toolID + argsJSON) so Allow can
+    /// re-fire exactly what the LLM asked for.
+    ///
+    /// `internal` so the unit-test target can exercise the catch-arm
+    /// behavior without spinning up the live `AgentLoopHost` singleton.
+    func handleEventKitPermissionRequired(signal: PermissionRequiredSignal) {
+        let kind: PermissionPromptModel.Kind = {
+            switch signal.scope {
+            case .calendarFullAccess: return .eventKitCalendarFull
+            case .calendarWriteOnly: return .eventKitCalendarWrite
+            case .remindersFullAccess: return .eventKitRemindersFull
+            case .remindersWriteOnly: return .eventKitRemindersWrite
+            }
+        }()
+        let model = PermissionPromptModel(
+            kind: kind,
+            pendingToolID: signal.pendingToolID,
+            pendingArgsJSON: signal.pendingArgsJSON,
+            state: .awaitingTap
+        )
+        appendMessage(ChatMessage(
+            id: UUID().uuidString,
+            timestamp: clock(),
+            body: .permissionPrompt(model)
+        ))
+    }
+
+    func handleHealthKitPermissionRequired(signal: HealthPermissionRequiredSignal) {
+        let kind: PermissionPromptModel.Kind = {
+            switch signal.scope {
+            case .readAll: return .healthKitReadAll
+            }
+        }()
+        let model = PermissionPromptModel(
+            kind: kind,
+            pendingToolID: signal.pendingToolID,
+            pendingArgsJSON: signal.pendingArgsJSON,
+            state: .awaitingTap
+        )
+        appendMessage(ChatMessage(
+            id: UUID().uuidString,
+            timestamp: clock(),
+            body: .permissionPrompt(model)
+        ))
+    }
+
+    /// User tapped Allow on a permission-prompt bubble. Drives the OS
+    /// sheet via the appropriate gateway; on grant, re-fires the pending
+    /// tool call exactly once (addendum §1.9 — "auto-retries the original
+    /// tool call once"); on deny, marks the bubble resolved with a
+    /// systemNote-style follow-up explaining Steward will route around.
+    func grantPermission(forMessageID id: String) async {
+        guard let index = messages.firstIndex(where: { $0.id == id }),
+              case .permissionPrompt(var model) = messages[index].body else {
+            return
+        }
+        model.state = .requesting
+        replaceMessage(at: index, with: .permissionPrompt(model))
+
+        let granted: Bool
+        switch model.kind {
+        case .eventKitCalendarFull:
+            granted = isGranted(await permissionFlow.requestEventKitAccess(scope: .calendarFullAccess))
+        case .eventKitCalendarWrite:
+            granted = isGranted(await permissionFlow.requestEventKitAccess(scope: .calendarWriteOnly))
+        case .eventKitRemindersFull:
+            granted = isGranted(await permissionFlow.requestEventKitAccess(scope: .remindersFullAccess))
+        case .eventKitRemindersWrite:
+            granted = isGranted(await permissionFlow.requestEventKitAccess(scope: .remindersWriteOnly))
+        case .healthKitReadAll:
+            granted = isGranted(await permissionFlow.requestHealthKitAccess(scope: .readAll))
+        }
+
+        if granted {
+            await retryPendingToolCall(at: id, model: model)
+        } else {
+            resolvePromptDenied(at: id, model: model)
+        }
+    }
+
+    /// User tapped Not now. No OS sheet; bubble resolves to a deny note,
+    /// and the original prompt is dropped — addendum §1.9 says we don't
+    /// loop, and the LLM never sees `.permissionRequired`, so there's no
+    /// model-side recovery to wait on.
+    func denyPermission(forMessageID id: String) async {
+        guard let index = messages.firstIndex(where: { $0.id == id }),
+              case .permissionPrompt(let model) = messages[index].body else {
+            return
+        }
+        resolvePromptDenied(at: id, model: model)
+    }
+
+    private func retryPendingToolCall(at promptID: String, model: PermissionPromptModel) async {
+        guard let toolID = model.pendingToolID,
+              let argsJSON = model.pendingArgsJSON else {
+            // Nothing concrete to retry (defensive — the session layer
+            // always enriches the signal, but if some future tool throws
+            // bare, fall back to acknowledging the grant without re-firing).
+            updatePrompt(id: promptID, state: .resolved(text: "Access granted."))
+            return
+        }
+        do {
+            _ = try await permissionFlow.retryToolCall(toolID: toolID, argsJSON: argsJSON)
+            updatePrompt(id: promptID, state: .resolved(text: "Access granted. Done."))
+        } catch let signal as PermissionRequiredSignal {
+            // Status flipped between grant + retry (race with another
+            // process toggling Settings). Single-shot: don't loop.
+            updatePrompt(
+                id: promptID,
+                state: .resolved(text: "Couldn't complete the action — \(scopeLabel(signal.scope)) access didn't stick.")
+            )
+        } catch let signal as HealthPermissionRequiredSignal {
+            updatePrompt(
+                id: promptID,
+                state: .resolved(text: "Couldn't complete the action — Health access didn't stick.")
+            )
+            _ = signal // explicit to make non-loop intent obvious to readers
+        } catch {
+            updatePrompt(
+                id: promptID,
+                state: .resolved(text: "Couldn't complete the action: \(String(describing: error))")
+            )
+        }
+    }
+
+    private func resolvePromptDenied(at promptID: String, model: PermissionPromptModel) {
+        updatePrompt(
+            id: promptID,
+            state: .resolved(text: "Not allowed — Steward will work around this.")
+        )
+    }
+
+    private func updatePrompt(id: String, state: PermissionPromptModel.State) {
+        guard let index = messages.firstIndex(where: { $0.id == id }),
+              case .permissionPrompt(var model) = messages[index].body else {
+            return
+        }
+        model.state = state
+        replaceMessage(at: index, with: .permissionPrompt(model))
+    }
+
+    private func replaceMessage(at index: Int, with body: ChatMessage.Body) {
+        let existing = messages[index]
+        messages[index] = ChatMessage(id: existing.id, timestamp: existing.timestamp, body: body)
+    }
+
+    private func isGranted(_ status: EKAuthorizationStatus) -> Bool {
+        switch status {
+        case .fullAccess, .writeOnly, .authorized: return true
+        case .notDetermined, .denied, .restricted: return false
+        @unknown default: return false
+        }
+    }
+
+    private func isGranted(_ state: HealthAuthState) -> Bool {
+        switch state {
+        case .authorized: return true
+        case .notDetermined, .denied, .error: return false
+        }
+    }
+
+    private func scopeLabel(_ scope: EKPermissionScope) -> String {
+        switch scope {
+        case .calendarFullAccess, .calendarWriteOnly: return "Calendar"
+        case .remindersFullAccess, .remindersWriteOnly: return "Reminders"
+        }
     }
 
     /// User tapped "Walk me through it" chip — fill the input with the literal

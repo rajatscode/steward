@@ -185,5 +185,12 @@ struct HealthQuantitySample: Codable, Sendable, Equatable {
 /// matching the EventKit `PermissionRequiredSignal` contract verbatim.
 struct HealthPermissionRequiredSignal: Error, Sendable, Equatable {
     let scope: HealthPermissionScope
-    init(scope: HealthPermissionScope) { self.scope = scope }
+    var pendingToolID: String?
+    var pendingArgsJSON: String?
+
+    init(scope: HealthPermissionScope, pendingToolID: String? = nil, pendingArgsJSON: String? = nil) {
+        self.scope = scope
+        self.pendingToolID = pendingToolID
+        self.pendingArgsJSON = pendingArgsJSON
+    }
 }

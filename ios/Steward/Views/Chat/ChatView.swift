@@ -135,6 +135,16 @@ struct ChatView: View {
             SystemNoteRow(text: text)
         case .stillWorkingNote:
             SystemNoteRow(text: "Still working. Foundation Models can be slow on first cold start.")
+        case .permissionPrompt(let model):
+            PermissionPromptBubble(
+                model: model,
+                onAllow: {
+                    Task { await viewModel.grantPermission(forMessageID: message.id) }
+                },
+                onDeny: {
+                    Task { await viewModel.denyPermission(forMessageID: message.id) }
+                }
+            )
         }
     }
 

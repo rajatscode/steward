@@ -40,6 +40,12 @@ public actor AgentLoopHost {
     public struct Ready: Sendable {
         public let loop: AgentLoop
         public let backendKind: LLMBackendKind
+        /// Registry handle so the chat UI can re-fire a single tool call
+        /// after an inline permission grant (addendum §1.9 — "auto-retries
+        /// the original tool call once"). Exposed here, not on AgentLoop,
+        /// because the retry path does NOT consume a turn budget hop and
+        /// does NOT go through the LLM at all.
+        public let toolRegistry: any ToolRegistry
     }
 
     private var state: State = .unset
@@ -74,6 +80,21 @@ public actor AgentLoopHost {
     public func currentBackendKind() async -> LLMBackendKind? {
         if case .ready(let r) = state { return r.backendKind }
         return nil
+    }
+
+    /// Re-fire the exact tool invocation the model attempted before the
+    /// permission signal was thrown. Returns the tool's wire JSON on
+    /// success (which the UI can summarise into a tool-call card), throws
+    /// the same signal again if the user actually denied access at the OS
+    /// sheet, or any other tool error otherwise. The chat UI is responsible
+    /// for the "retry once" contract — this method itself does not loop.
+    public func retryToolCall(toolID: String, argsJSON: String) async throws -> String {
+        let ready = try await ready()
+        guard let typed = ToolID(rawValue: toolID),
+              let tool = await ready.toolRegistry.tool(for: typed) else {
+            throw LLMSessionError.toolNotFound(toolID: toolID)
+        }
+        return try await tool.invoke(argsJSON: argsJSON)
     }
 
     // MARK: - Construction
@@ -144,6 +165,6 @@ public actor AgentLoopHost {
             resolver: resolver,
             temperature: temperature
         )
-        return Ready(loop: loop, backendKind: resolution.kind)
+        return Ready(loop: loop, backendKind: resolution.kind, toolRegistry: registry)
     }
 }
