@@ -105,14 +105,33 @@ enum TrackFBootstrap {
         // 2. Pick a CSV mirror root. Prefer the iCloud ubiquity container; if
         //    iCloud Drive isn't enabled, fall back to Application Support so
         //    the user still gets a working in-app surface.
+        //
+        //    Whichever way the branch lands, publish the resolved availability
+        //    so Settings (CaptureSection footnote + fallback banner) can show
+        //    honest copy — v1 silently degraded to the sandbox and users
+        //    looking for a Steward folder under iCloud Drive on Mac/iPad
+        //    found nothing (nemesis caveat C).
+        let containerID = "iCloud.com.rajatscode.steward"
+        let availability = CSVMirrorAvailabilityClassifier.classify(
+            mirrorEnabled: settings.csvMirrorEnabled,
+            folderName: settings.icloudDriveFolder,
+            ubiquityContainerAvailable: {
+                FileManager.default.url(forUbiquityContainerIdentifier: containerID) != nil
+            }
+        )
+        await MainActor.run {
+            CSVMirrorAvailabilityRegistry.publish(availability)
+        }
+
         if settings.csvMirrorEnabled {
             let root: CSVMirrorRoot
-            if FileManager.default.url(forUbiquityContainerIdentifier: "iCloud.com.rajatscode.steward") != nil {
+            switch availability {
+            case .iCloud:
                 root = .ubiquityContainer(
-                    identifier: "iCloud.com.rajatscode.steward",
+                    identifier: containerID,
                     subfolder: settings.icloudDriveFolder
                 )
-            } else {
+            case .localSandbox, .disabled:
                 root = .applicationSupport(subfolder: settings.icloudDriveFolder)
             }
             if let paths = try? CSVMirrorPaths.resolve(root) {
