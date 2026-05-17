@@ -2,17 +2,19 @@
 
 > **Structure your life. Make better choices.**
 
+**v0.1.0-alpha. Code is written; end-to-end device validation pending. Treat as a development build.**
+
 A single-user, offline-first iOS app that acts as a **personal institutional layer**: a coordinator agent plus per-domain sub-agents that take ownership of the maintenance work for your foundational life systems — sleep, money, home, therapy follow-through, hobbies, whatever you ask it to carry.
 
-(Internal codebase identifiers — Swift module, Xcode project, directory paths — remain `Steward` for v1.5; the user-visible product name is Outkeep. Internal-path mentions like `ios/Steward/` are intentional.)
+(Internal codebase identifiers — Swift module, Xcode project, directory paths — remain `Steward`; the user-visible product name is Outkeep. Internal-path mentions like `ios/Steward/` are intentional.)
 
 Agents have full autonomy to log events, update spreadsheet-style instruments, schedule local notifications, write to Calendar and Reminders, and persist memory across sessions. Every external action is logged with the agent's reasoning so it's auditable and reversible. Inference runs on-device via Apple Foundation Models, so the coordinator works on the subway.
 
 Full design: [`spec.md`](spec.md).
 
-## Status — v1
+## Status — v0.1.0-alpha
 
-All six build tracks merged to `main`. Build green on simulator. The app is intended for **a single user (Rajat) on a single iPhone**.
+All six build tracks merged to `main`. Build green on simulator. **End-to-end device validation is still pending** — code paths exist for the items below but have not been exercised on real hardware. The app is intended for **a single user (Rajat) on a single iPhone**.
 
 | Track | What it covers |
 |---|---|
@@ -36,7 +38,7 @@ Short version:
 3. `open ios/Steward.xcodeproj`. Set **Minimum Deployments → iOS** to `26.0`. Build (⌘B).
 4. Plug in iPhone (developer mode on), pick it in Xcode's target picker, ⌘R. Bundle ID is `com.rajatscode.outkeep`.
 
-## What's in v1
+## What's in v0.1.0-alpha
 
 - **Three tabs:** Chat (coordinator + voice), Today (active instruments + upcoming commitments + morning brief), Settings (quiet hours, notification cap, mercy/pause toggles, audit log with per-action undo).
 - **Two-tier agent loop:** a coordinator the user chats with, and per-domain agents the coordinator hands off to. Both run on Apple Foundation Models with the same call shape; only the assembled system prompt and tool subset differ.
@@ -70,10 +72,10 @@ Listed here so you don't expect them. Full reasoning in [`spec.md`](spec.md) §2
 
 ```
 spec.md                          design spec (single source of truth)
-docs/sunday-morning-startup.md   first-thing-Sunday startup runbook
+docs/sunday-morning-startup.md   first-launch startup runbook
 design/                          coordinator empty-state script, UI specs
 qa/                              regression checklist
-research/, investigation/        lit review + design investigation notes
+investigation/                   pre-build design investigation notes
 scripts/fetch-whisperkit-model.sh   bundles WhisperKit model into the app
 ios/Steward.xcodeproj            Xcode project
 ios/Steward/                     app source (Agent, Tools, Views, etc.)

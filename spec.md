@@ -2,7 +2,7 @@
 
 ## 0. TL;DR
 
-Steward is a single-user, offline-first, native iOS app that acts as a **personal institutional layer**: a coordinator agent plus per-domain sub-agents that take ownership of the maintenance work for the user's foundational life systems (health, home, money, work, social, therapy follow-through, hobbies, anything else). Agents have full autonomy to read/write Calendar, Reminders, instrument-spreadsheets (built-in, with optional Google Sheets mirror), schedule local notifications, and register cron-like recurring jobs. Every external action is logged for audit. Inference runs on-device via Apple Foundation Models so the coordinator works on the subway. Spreadsheets are agent-maintained state (math is correct, formulas survive), the event log is immutable history, and a hybrid embeddings + FTS5 memory layer gives agents qualitative recall across domains. v1 ships overnight in /hackathon mode and is usable when the user wakes up Sunday morning.
+Steward is a single-user, offline-first, native iOS app that acts as a **personal institutional layer**: a coordinator agent plus per-domain sub-agents that take ownership of the maintenance work for the user's foundational life systems (health, home, money, work, social, therapy follow-through, hobbies, anything else). Agents have full autonomy to read/write Calendar, Reminders, instrument-spreadsheets (built-in, with optional Google Sheets mirror), schedule local notifications, and register cron-like recurring jobs. Every external action is logged for audit. Inference runs on-device via Apple Foundation Models so the coordinator works on the subway. Spreadsheets are agent-maintained state (math is correct, formulas survive), the event log is immutable history, and a hybrid embeddings + FTS5 memory layer gives agents qualitative recall across domains. **Current state: v0.1.0-alpha — code is written, end-to-end device validation pending.**
 
 ## 1. Problem and goal
 
@@ -716,9 +716,9 @@ This flow is encoded as guidance in the coordinator's system prompt, NOT as hard
 
 ### Why no Health pre-seed
 
-The user's words: "i want to architect that myself with the agent instead of having you guess what i want and getting it wrong." Respect this. The cost is the first 5 minutes Sunday morning are spent spawning a domain instead of immediately logging an event. The benefit is the user owns the design from turn one, which directly serves the continuity-not-prescription principle.
+The user's words: "i want to architect that myself with the agent instead of having you guess what i want and getting it wrong." Respect this. The cost is the first 5 minutes are spent spawning a domain instead of immediately logging an event. The benefit is the user owns the design from turn one, which directly serves the continuity-not-prescription principle.
 
-### Sunday morning user journey (revised)
+### First-morning user journey (revised)
 
 ```
 07:00  Morning brief notification fires (default time, configurable in onboarding)
@@ -732,9 +732,9 @@ The user's words: "i want to architect that myself with the agent instead of hav
 22:30  Wind-down notification fires
 ```
 
-This is the realistic v1 morning. The success metric: did the spawn-first-domain conversation feel smooth, or did it feel like a quiz?
+This is the realistic v0.1.0-alpha morning. The success metric: did the spawn-first-domain conversation feel smooth, or did it feel like a quiz?
 
-## 17. Onboarding (first launch Sunday morning)
+## 17. Onboarding (first launch)
 
 1. Foundation Models availability check (fail soft if unavailable: explain need iOS 26+ on supported hardware with Apple Intelligence enabled)
 2. Request notifications permission
@@ -807,9 +807,9 @@ Total estimated hours: ~13 person-hours, parallelized to ~5-7 wall hours (down f
 
 If we run /hackathon mode with subagents, target wake-up is closer to 4–5 AM with polish time.
 
-## 20. Sunday morning Definition of Done
+## 20. v0.1.0-alpha Definition of Done
 
-When the user opens Steward Sunday morning, the following MUST work:
+When the user opens Outkeep on first device launch, the following MUST work (none of these have yet been verified end-to-end on hardware):
 
 1. **App launches on iPhone**, Foundation Models confirmed available, Apple Intelligence active
 2. **Chat tab opens**, coordinator greets and runs the empty-state protocol (section 16)
@@ -830,7 +830,7 @@ If any of these fail, that's a P0 for first-day patches. Everything else is iter
 
 ## 21. Explicitly deferred (with reasons, not dismissals)
 
-These are real and we should build them. They're deferred to v1.1+ because they're not on the critical path for Sunday morning, NOT because they're "out of scope."
+These are real and we should build them. They're deferred to v1.1+ because they're not on the critical path for the v0.1.0-alpha DoD, NOT because they're "out of scope."
 
 | Item | Why deferred | Target |
 |---|---|---|

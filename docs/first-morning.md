@@ -1,5 +1,7 @@
 # First morning with Outkeep
 
+**v0.1.0-alpha. Code is written; end-to-end device validation pending. The walkthrough below describes intended behavior, not behavior that has been confirmed on hardware.**
+
 You have the app on your phone. Onboarding ran. You're looking at the Chat tab. This is what happens next.
 
 For build/deploy steps, see `sunday-morning-startup.md`. For the design rationale, see `../design/coordinator-empty-state-v2.md`. This file is just "what to do in the first five minutes."

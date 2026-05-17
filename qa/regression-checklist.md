@@ -8,9 +8,9 @@
 
 ---
 
-## A. Tuesday-morning Definition of Done (spec §20)
+## A. v0.1.0-alpha Definition of Done (spec §20)
 
-These 14 items are the contractual ship gate. Every integration must leave all previously-passing items still passing.
+These 14 items are the contractual ship gate. Every integration must leave all previously-passing items still passing. **Note: most of these have only been exercised under MockLLMSession + simulator. End-to-end device validation against the real Foundation Models runtime is still pending.**
 
 | # | Check | Notes |
 |---|---|---|

@@ -1,6 +1,6 @@
-# Sunday morning startup
+# v0.1.0-alpha startup
 
-Audience: Rajat. Read this first thing — before opening the project.
+Audience: Rajat. Read this first thing — before opening the project. **This is a v0.1.0-alpha build: code is written but not yet end-to-end-validated on device. Treat every "PASS" below as "expected to pass" until you confirm it on hardware.**
 
 ## 1. State of the build
 
@@ -92,7 +92,7 @@ All seven implementations live in `ios/Steward/Instruments/Kinds/`. State recomp
 
 ## 8. The 14-item DoD checklist (spec.md §20)
 
-Self-QA Sunday morning. Check each as you confirm it. Anything unchecked goes back to the team.
+Self-QA on first device launch. Check each as you confirm it. Anything unchecked goes back to the team. **None of these has been verified on device yet.**
 
 - [ ] **1.** App launches on iPhone, Foundation Models confirmed available, Apple Intelligence active
 - [ ] **2.** Chat tab opens, coordinator greets and runs the empty-state protocol (section 16)
@@ -115,7 +115,7 @@ Self-QA Sunday morning. Check each as you confirm it. Anything unchecked goes ba
 - Every agent action is in **Settings → Recent agent actions** with the `reasoning` field and a working undo button. If an agent did something unexpected, that's where you find out why and reverse it.
 - For anything weirder than a single failed action, reply in chat with the failing DoD item number and what you saw.
 
-## 10. What's not in v1 (per spec §21)
+## 10. What's not in v0.1.0-alpha (per spec §21)
 
 Deferred on purpose. Don't be surprised when these are missing:
 
