@@ -144,17 +144,14 @@ final class NotificationSchedulerTests: XCTestCase {
     }
 
     func testDailyMaxThreeBlocksFourth() async {
-        // Cap = 3/day. Fire 4 events on the same day spaced > 90 min apart.
+        // Cap = 3/day. Fire 5 requests on the same day spaced > 90 min apart.
+        // Serial submission — cap math depends on call order.
         let (sched, _, clock, _) = makeScheduler()
         let base = clock.now()
-        let outcomes = await withTaskGroup(of: ScheduleOutcome.self) { _ -> [ScheduleOutcome] in
-            // serial — order matters for cap math semantics
-            var results: [ScheduleOutcome] = []
-            for i in 0..<5 {
-                let when = base.addingTimeInterval(TimeInterval((i + 1) * 60 * 100)) // 100 min apart
-                results.append(await sched.schedule(makeRequest(at: when), scope: .coordinator))
-            }
-            return results
+        var outcomes: [ScheduleOutcome] = []
+        for i in 0..<5 {
+            let when = base.addingTimeInterval(TimeInterval((i + 1) * 60 * 100)) // 100 min apart
+            outcomes.append(await sched.schedule(makeRequest(at: when), scope: .coordinator))
         }
         // First 3 land; 4th and 5th hit dailyMax.
         XCTAssertEqual(outcomes.count, 5)
