@@ -1,0 +1,6 @@
+# Block every file under this directory except the placeholder + this ignore.
+# WhisperKit models are 1.6GB; they are populated by
+# scripts/fetch-whisperkit-model.sh and must never enter git.
+*
+!.gitkeep
+!.gitignore
