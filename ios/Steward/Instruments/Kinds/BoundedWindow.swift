@@ -150,7 +150,38 @@ enum BoundedWindow: InstrumentKind {
         current: State,
         definition: Definition
     ) throws -> [ManualCorrection] {
-        return []
+        // Editable cells: `actual_start` and `actual_end` per night row.
+        // in_window + compliance_pct are render-only (recomputed).
+        let iso = ISO8601DateFormatter()
+        var out: [ManualCorrection] = []
+        for (_, row, night) in CSVDiff.pairedRows(table: table, stateEntries: current.nightsInWindow) {
+            let rowID = CSVDiff.cellAt(row: row, header: table.header, column: "__row_id")
+            // actual_start
+            if let newStartStr = CSVDiff.cellAt(row: row, header: table.header, column: "actual_start"),
+               let newStart = iso.date(from: newStartStr),
+               newStart != night.actualStart {
+                out.append(CSVDiff.correction(
+                    rowID: rowID,
+                    cell: "actual_start",
+                    oldValue: iso.string(from: night.actualStart),
+                    newValue: newStartStr,
+                    reason: "user edited actual_start cell in data.csv"
+                ))
+            }
+            // actual_end
+            if let newEndStr = CSVDiff.cellAt(row: row, header: table.header, column: "actual_end"),
+               let newEnd = iso.date(from: newEndStr),
+               newEnd != night.actualEnd {
+                out.append(CSVDiff.correction(
+                    rowID: rowID,
+                    cell: "actual_end",
+                    oldValue: iso.string(from: night.actualEnd),
+                    newValue: newEndStr,
+                    reason: "user edited actual_end cell in data.csv"
+                ))
+            }
+        }
+        return out
     }
 
     // MARK: - Math

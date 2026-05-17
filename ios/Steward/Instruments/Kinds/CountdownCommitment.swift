@@ -167,7 +167,42 @@ enum CountdownCommitment: InstrumentKind {
         current: State,
         definition: Definition
     ) throws -> [ManualCorrection] {
-        return []
+        // Editable cells: `notes` per completed event row, AND `count` (the
+        // denormalized total). `count` is the same in every row — we only
+        // emit one correction (from the first row) if it differs.
+        var out: [ManualCorrection] = []
+
+        // notes per row
+        for (_, row, completed) in CSVDiff.pairedRows(table: table, stateEntries: current.completedEvents) {
+            if let newNotes = CSVDiff.cellAt(row: row, header: table.header, column: "notes") {
+                let oldNotes = completed.notes ?? ""
+                if newNotes != oldNotes {
+                    let rowID = CSVDiff.cellAt(row: row, header: table.header, column: "__row_id")
+                    out.append(CSVDiff.correction(
+                        rowID: rowID,
+                        cell: "notes",
+                        oldValue: oldNotes,
+                        newValue: newNotes,
+                        reason: "user edited notes cell in data.csv"
+                    ))
+                }
+            }
+        }
+
+        // count (denormalized; check first row only)
+        if let firstRow = table.rows.first,
+           let newCountStr = CSVDiff.cellAt(row: firstRow, header: table.header, column: "count"),
+           let newCount = Int(newCountStr),
+           newCount != current.count {
+            out.append(CSVDiff.correction(
+                rowID: CSVDiff.cellAt(row: firstRow, header: table.header, column: "__row_id"),
+                cell: "count",
+                oldValue: String(current.count),
+                newValue: String(newCount),
+                reason: "user edited count cell in data.csv"
+            ))
+        }
+        return out
     }
 
     // MARK: - Window math

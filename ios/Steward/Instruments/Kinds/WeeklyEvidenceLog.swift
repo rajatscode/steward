@@ -155,7 +155,24 @@ enum WeeklyEvidenceLog: InstrumentKind {
         current: State,
         definition: Definition
     ) throws -> [ManualCorrection] {
-        return []
+        // Editable cell: `text`. rowID is "entry-<idx>" per renderCSV.
+        var out: [ManualCorrection] = []
+        for (_, row, entry) in CSVDiff.pairedRows(table: table, stateEntries: current.currentWeekEntries) {
+            guard let newText = CSVDiff.cellAt(row: row, header: table.header, column: "text") else {
+                continue
+            }
+            if newText != entry.text {
+                let rowID = CSVDiff.cellAt(row: row, header: table.header, column: "__row_id")
+                out.append(CSVDiff.correction(
+                    rowID: rowID,
+                    cell: "text",
+                    oldValue: entry.text,
+                    newValue: newText,
+                    reason: "user edited text cell in data.csv"
+                ))
+            }
+        }
+        return out
     }
 
     // MARK: - Helpers

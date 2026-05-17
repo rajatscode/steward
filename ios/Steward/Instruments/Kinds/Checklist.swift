@@ -196,7 +196,43 @@ enum Checklist: InstrumentKind {
         current: State,
         definition: Definition
     ) throws -> [ManualCorrection] {
-        return []
+        // Editable cell: `checked` (boolean-like). rowID = item.id.
+        // Match by rowID directly (each Checklist item has a stable string ID).
+        var out: [ManualCorrection] = []
+        let truthy: Set<String> = ["true", "1", "yes", "y", "✓"]
+        let falsy:  Set<String> = ["false", "0", "no", "n", ""]
+        for row in table.rows {
+            guard let rowID = CSVDiff.cellAt(row: row, header: table.header, column: "__row_id"),
+                  definition.items.contains(where: { $0.id == rowID }) else {
+                // Unknown rowID — skip rather than throw; Pod F may have a
+                // stale row from a removed item.
+                continue
+            }
+            guard let rawChecked = CSVDiff.cellAt(row: row, header: table.header, column: "checked")?.lowercased() else {
+                continue
+            }
+            let newChecked: Bool
+            if truthy.contains(rawChecked) {
+                newChecked = true
+            } else if falsy.contains(rawChecked) {
+                newChecked = false
+            } else {
+                throw InstrumentKindError.unparseableCSV(
+                    reason: "Checklist data.csv `checked` cell must be boolean-like, got '\(rawChecked)'"
+                )
+            }
+            let oldChecked = current.checkedToday.contains(rowID)
+            if newChecked != oldChecked {
+                out.append(CSVDiff.correction(
+                    rowID: rowID,
+                    cell: "checked",
+                    oldValue: oldChecked ? "true" : "false",
+                    newValue: newChecked ? "true" : "false",
+                    reason: "user toggled checked cell in data.csv"
+                ))
+            }
+        }
+        return out
     }
 
     // MARK: - Recurrence

@@ -159,16 +159,31 @@ enum RunningAccumulator: InstrumentKind {
         current: State,
         definition: Definition
     ) throws -> [ManualCorrection] {
-        // RunningAccumulator's data.csv only has user-meaningful edits in the
-        // `value` column — the totals are render-only and Pod F's reconciler
-        // ignores changes there. We surface each row whose value differs from
-        // the matching event's recorded value as a correction.
-        //
-        // Pod F is responsible for matching __row_id → event_id and supplying
-        // the correction; here we simply confirm the table parses and let the
-        // caller iterate. For v1, we return an empty list — actual diff
-        // detection lives in Pod F's CSVMirrorWatcher.
-        return []
+        // Editable cell: `value`. Totals (today_total, seven_day_avg,
+        // thirty_day_avg) are render-only — edits there are silently
+        // ignored. Match table rows to state.windowEvents by chronological
+        // index (Pod F's CSV preserves render order).
+        var out: [ManualCorrection] = []
+        for (_, row, entry) in CSVDiff.pairedRows(table: table, stateEntries: current.windowEvents) {
+            guard let valueStr = CSVDiff.cellAt(row: row, header: table.header, column: "value"),
+                  let newValue = Double(valueStr) else {
+                throw InstrumentKindError.unparseableCSV(
+                    reason: "RunningAccumulator data.csv row missing or non-numeric `value` cell"
+                )
+            }
+            let oldValue = entry.value
+            if newValue != oldValue {
+                let rowID = CSVDiff.cellAt(row: row, header: table.header, column: "__row_id")
+                out.append(CSVDiff.correction(
+                    rowID: rowID,
+                    cell: "value",
+                    oldValue: String(oldValue),
+                    newValue: String(newValue),
+                    reason: "user edited value cell in data.csv"
+                ))
+            }
+        }
+        return out
     }
 
     // MARK: - Math (private; pure)

@@ -176,6 +176,56 @@ protocol InstrumentKind {
     ) throws -> [ManualCorrection]
 }
 
+// MARK: - CSV diff helpers (kind-shared)
+
+/// Conveniences used by every kind's `parseCSVOverride`. Centralized so the
+/// "for each row, compare cell N against state's nth entry, emit
+/// `ManualCorrection` on differ" pattern is one place to audit.
+enum CSVDiff {
+
+    /// Header index → 3 meta columns + kind columns. `__row_id, __steward_version,
+    /// __last_synced_at` are the first three. Returns nil if the table doesn't
+    /// have at least the requested column.
+    static func cellAt(row: [String], header: [String], column: String) -> String? {
+        guard let idx = header.firstIndex(of: column), idx < row.count else { return nil }
+        return row[idx]
+    }
+
+    /// Iterate (rowIndex, row) pairs that have a corresponding state entry
+    /// (i.e., truncated to min(table.rows.count, stateEntryCount)). Skips
+    /// "new rows" the user added — those become `log_entry` events at Pod F.
+    static func pairedRows<T>(
+        table: CSVTable,
+        stateEntries: [T]
+    ) -> [(rowIndex: Int, row: [String], stateEntry: T)] {
+        let limit = min(table.rows.count, stateEntries.count)
+        return (0..<limit).map { i in
+            (rowIndex: i, row: table.rows[i], stateEntry: stateEntries[i])
+        }
+    }
+
+    /// Build a single `ManualCorrection`. `appliedAt` defaults to `Date()` —
+    /// callers may override for tests. ULID for the correction id.
+    static func correction(
+        rowID: String?,
+        cell: String,
+        oldValue: String?,
+        newValue: String?,
+        appliedAt: Date = Date(),
+        reason: String
+    ) -> ManualCorrection {
+        ManualCorrection(
+            correctionID: ULID.generate(now: appliedAt),
+            rowID: rowID,
+            cell: cell,
+            oldValue: oldValue,
+            newValue: newValue,
+            appliedAt: appliedAt,
+            reason: reason
+        )
+    }
+}
+
 // MARK: - Default migrate
 
 extension InstrumentKind {

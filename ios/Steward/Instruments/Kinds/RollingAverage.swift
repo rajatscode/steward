@@ -139,7 +139,27 @@ enum RollingAverage: InstrumentKind {
         current: State,
         definition: Definition
     ) throws -> [ManualCorrection] {
-        return []
+        // Editable cell: `value` per window sample. `current` is render-only.
+        var out: [ManualCorrection] = []
+        for (_, row, sample) in CSVDiff.pairedRows(table: table, stateEntries: current.windowValues) {
+            guard let valueStr = CSVDiff.cellAt(row: row, header: table.header, column: "value"),
+                  let newValue = Double(valueStr) else {
+                throw InstrumentKindError.unparseableCSV(
+                    reason: "RollingAverage data.csv row missing or non-numeric `value` cell"
+                )
+            }
+            if newValue != sample.value {
+                let rowID = CSVDiff.cellAt(row: row, header: table.header, column: "__row_id")
+                out.append(CSVDiff.correction(
+                    rowID: rowID,
+                    cell: "value",
+                    oldValue: String(sample.value),
+                    newValue: String(newValue),
+                    reason: "user edited value cell in data.csv"
+                ))
+            }
+        }
+        return out
     }
 
     // MARK: - Math

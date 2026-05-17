@@ -150,9 +150,39 @@ enum BoundedBudget: InstrumentKind {
         current: State,
         definition: Definition
     ) throws -> [ManualCorrection] {
-        // See RunningAccumulator note — Pod F drives the diff, kind returns []
-        // until the CSV reconciliation flow lands.
-        return []
+        // Editable cells: `value` (spend amount) + `notes` per recent entry.
+        // period_total / remaining / rollover_balance are render-only and
+        // recomputed from value edits.
+        var out: [ManualCorrection] = []
+        for (_, row, entry) in CSVDiff.pairedRows(table: table, stateEntries: current.recentEntries) {
+            let rowID = CSVDiff.cellAt(row: row, header: table.header, column: "__row_id")
+            // value
+            if let valueStr = CSVDiff.cellAt(row: row, header: table.header, column: "value"),
+               let newValue = Double(valueStr),
+               newValue != entry.value {
+                out.append(CSVDiff.correction(
+                    rowID: rowID,
+                    cell: "value",
+                    oldValue: String(entry.value),
+                    newValue: String(newValue),
+                    reason: "user edited value cell in data.csv"
+                ))
+            }
+            // notes
+            if let newNotes = CSVDiff.cellAt(row: row, header: table.header, column: "notes") {
+                let oldNotes = entry.notes ?? ""
+                if newNotes != oldNotes {
+                    out.append(CSVDiff.correction(
+                        rowID: rowID,
+                        cell: "notes",
+                        oldValue: oldNotes,
+                        newValue: newNotes,
+                        reason: "user edited notes cell in data.csv"
+                    ))
+                }
+            }
+        }
+        return out
     }
 
     // MARK: - Period math
