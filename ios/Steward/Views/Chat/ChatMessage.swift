@@ -30,6 +30,61 @@ struct ChatMessage: Identifiable, Equatable {
         case thinkingDomain(domainKey: String, displayName: String)
         case systemNote(text: String)
         case stillWorkingNote
+        /// Inline permission-grant card (addendum §1.9). Rendered when a
+        /// tool throws `PermissionRequiredSignal` or
+        /// `HealthPermissionRequiredSignal` mid-turn. The user taps Allow to
+        /// run the OS permission sheet; on grant, ChatViewModel auto-retries
+        /// the pending tool call once.
+        case permissionPrompt(PermissionPromptModel)
+    }
+}
+
+/// Static descriptor for a permission-prompt bubble. Carries the scope
+/// (rendered as copy), the kind (drives which gateway to call on Allow),
+/// and the pending tool call (re-fired on grant). `state` flips from
+/// `.awaitingTap` → `.requesting` → `.resolved` so the bubble updates
+/// without being replaced in the transcript (preserves scroll position).
+struct PermissionPromptModel: Equatable {
+    enum Kind: Equatable {
+        case eventKitCalendarFull
+        case eventKitCalendarWrite
+        case eventKitRemindersFull
+        case eventKitRemindersWrite
+        case healthKitReadAll
+    }
+
+    enum State: Equatable {
+        case awaitingTap
+        case requesting
+        case resolved(text: String)
+    }
+
+    let kind: Kind
+    let pendingToolID: String?
+    let pendingArgsJSON: String?
+    var state: State
+
+    var title: String {
+        switch kind {
+        case .eventKitCalendarFull, .eventKitCalendarWrite:
+            return "Calendar access"
+        case .eventKitRemindersFull, .eventKitRemindersWrite:
+            return "Reminders access"
+        case .healthKitReadAll:
+            return "Health access"
+        }
+    }
+
+    /// UXR v2 voice: direct ask, no moralization, no privacy hedge.
+    var body: String {
+        switch kind {
+        case .eventKitCalendarFull, .eventKitCalendarWrite:
+            return "Steward wants to read your calendar to help with scheduling. Allow?"
+        case .eventKitRemindersFull, .eventKitRemindersWrite:
+            return "Steward wants to add reminders for the things you commit to. Allow?"
+        case .healthKitReadAll:
+            return "Steward wants to read your sleep, weight, and step count from Apple Health. Allow?"
+        }
     }
 }
 

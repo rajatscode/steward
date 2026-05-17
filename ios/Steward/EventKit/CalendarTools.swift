@@ -379,7 +379,20 @@ private func encodeStatus(_ status: String, scope: EKPermissionScope, hint: Stri
 /// Track B's dispatcher catches this on the host side BEFORE the result reaches
 /// `LanguageModelSession`, runs the inline-grant flow, and retries the tool
 /// call once.
+///
+/// `pendingToolID` / `pendingArgsJSON` are populated by the LLM-session layer
+/// (Mock or FoundationModels) at the throw boundary so the UI's auto-retry
+/// can re-fire the exact tool invocation the user just granted permission
+/// for. Tool implementations themselves don't fill these — they throw the
+/// minimal form and the dispatch path enriches before propagating up.
 struct PermissionRequiredSignal: Error, Sendable {
     let scope: EKPermissionScope
-    init(scope: EKPermissionScope) { self.scope = scope }
+    var pendingToolID: String?
+    var pendingArgsJSON: String?
+
+    init(scope: EKPermissionScope, pendingToolID: String? = nil, pendingArgsJSON: String? = nil) {
+        self.scope = scope
+        self.pendingToolID = pendingToolID
+        self.pendingArgsJSON = pendingArgsJSON
+    }
 }

@@ -177,6 +177,22 @@ public actor MockLLMSession: LLMSession {
         }
         do {
             return try await tool.invoke(argsJSON: argsJSON)
+        } catch let signal as PermissionRequiredSignal {
+            // addendum §1.9 / HARD REJECT #19: never wrap or swallow permission
+            // signals — the UI host catches them by exact type and drives the
+            // inline-grant flow. Enrich with the in-flight tool call so the
+            // host can auto-retry once on grant.
+            throw PermissionRequiredSignal(
+                scope: signal.scope,
+                pendingToolID: signal.pendingToolID ?? toolID,
+                pendingArgsJSON: signal.pendingArgsJSON ?? argsJSON
+            )
+        } catch let signal as HealthPermissionRequiredSignal {
+            throw HealthPermissionRequiredSignal(
+                scope: signal.scope,
+                pendingToolID: signal.pendingToolID ?? toolID,
+                pendingArgsJSON: signal.pendingArgsJSON ?? argsJSON
+            )
         } catch {
             throw LLMSessionError.toolExecutionFailed(
                 toolID: toolID,
