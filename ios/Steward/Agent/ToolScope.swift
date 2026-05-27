@@ -79,8 +79,9 @@ enum ToolID: String, Sendable, Codable, CaseIterable, Hashable {
     case agentHandoff       = "agent.handoff"
     case agentCrossConsult  = "agent.cross_consult"
 
-    // Web (deferred but exposed)
+    // Web — Wikipedia OpenSearch (no key, public) + URLSession GET.
     case webSearch = "web.search"
+    case webFetch  = "web.fetch"
 
     // Settings + safety
     case mercyModeEngage = "mercy_mode.engage"

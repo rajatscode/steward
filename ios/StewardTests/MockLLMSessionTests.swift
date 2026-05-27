@@ -153,9 +153,16 @@ final class MockLLMSessionTests: XCTestCase {
     // MARK: - New tool intents (qa-1 gap fixes)
 
     func test_mercyMode_decodesAgainstMercyModeEngageArgs() throws {
+        // Pin `now` so the mock's untilWhen is computed against the same
+        // clock we assert against. The default planning clock is fixed in
+        // 2026-04 (deterministic test snapshots); without overriding, the
+        // sanity check below would be measured against the wall clock and
+        // drift further into the past with every passing day.
+        let now = Date()
         let plan = MockResponsePlan.plan(
             systemPrompt: "conversation_state: free_chat",
-            userMessage: "turn on mercy mode please"
+            userMessage: "turn on mercy mode please",
+            now: now
         )
         let call = try XCTUnwrap(plan.toolCalls.first)
         XCTAssertEqual(call.toolID, ToolID.mercyModeEngage.rawValue)
@@ -163,7 +170,8 @@ final class MockLLMSessionTests: XCTestCase {
         XCTAssertFalse(args.reason.isEmpty)
         XCTAssertFalse(args.reasoning.isEmpty)
         XCTAssertEqual(args.actor, "coordinator")
-        XCTAssertGreaterThan(args.untilWhen.timeIntervalSinceNow, -10)
+        // untilWhen should be in the future (the mock sets a 3-day window).
+        XCTAssertGreaterThan(args.untilWhen.timeIntervalSince(now), 0)
     }
 
     func test_quietHours_decodesAgainstQuietHoursSetArgs() throws {

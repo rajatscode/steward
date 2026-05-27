@@ -57,6 +57,10 @@ enum ToolCatalog {
             // its runtime deps when building the coordinator tool list; we
             // only contribute `cross_consult`, which is a true leaf tool).
             AgentCrossConsultTool(),
+            // Web — Wikipedia OpenSearch + URLSession GET. Both unkeyed,
+            // public, sim-verifiable.
+            WebSearchTool(),
+            WebFetchTool(),
             // Settings + safety
             MercyModeEngageTool(provider: provider, settings: settings, now: now),
             PauseEngageTool(provider: provider, settings: settings, now: now),

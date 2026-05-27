@@ -162,6 +162,8 @@ enum ToolCallSummaryBuilder {
             return ("set quiet hours", "\(start)–\(end)")
         case .webSearch:
             return ("searched the web", args["query"] ?? "for something")
+        case .webFetch:
+            return ("fetched", args["url"] ?? "a page")
         case .healthReadQuantity:
             let kind = args["type"] ?? "health data"
             return ("checked", "Apple Health \(kind)")
@@ -195,7 +197,7 @@ enum ToolCallSummaryBuilder {
              .domainList,
              .agentHandoff, .agentCrossConsult,
              .mercyModeEngage, .pauseEngage, .quietHoursSet,
-             .webSearch,
+             .webSearch, .webFetch,
              .healthReadQuantity:
             return false
         }
@@ -218,7 +220,8 @@ enum ToolCallSummaryBuilder {
              .csvMirrorEnsureInstrumentFile, .csvMirrorSyncNow, .csvMirrorReadOverrides,
              .domainCreate, .domainList, .domainUpdatePrompt, .domainArchive,
              .agentHandoff, .agentCrossConsult,
-             .mercyModeEngage, .pauseEngage, .quietHoursSet, .webSearch,
+             .mercyModeEngage, .pauseEngage, .quietHoursSet,
+             .webSearch, .webFetch,
              .healthReadQuantity:
             return false
         }
