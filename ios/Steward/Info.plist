@@ -78,14 +78,14 @@
 	<true/>
 	<key>NSUbiquitousContainers</key>
 	<dict>
-		<key>iCloud.com.rajatscode.steward</key>
+		<key>iCloud.com.rajatscode.outkeep</key>
 		<dict>
 			<key>NSUbiquitousContainerIsDocumentScopePublic</key>
 			<true/>
 			<key>NSUbiquitousContainerSupportedFolderLevels</key>
 			<string>Any</string>
 			<key>NSUbiquitousContainerName</key>
-			<string>Steward</string>
+			<string>Outkeep</string>
 		</dict>
 	</dict>
 

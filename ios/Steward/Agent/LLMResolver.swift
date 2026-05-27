@@ -34,6 +34,16 @@ enum LLMResolver {
     /// MockLLMSession with a typed reason so the UI can render a precise
     /// banner per §1.10.
     static func resolve() async -> LLMBackendResolution {
+        #if targetEnvironment(simulator)
+        // iOS Simulator reports SystemLanguageModel.isAvailable == true but
+        // ships no Apple Intelligence model weights — invocation fails with
+        // ModelManagerError 1026. Always mock on simulator.
+        let mockFactory = MockLLMSessionFactory(reason: .deviceNotEligible)
+        return LLMBackendResolution(
+            factory: mockFactory,
+            kind: .mock(reason: .deviceNotEligible)
+        )
+        #else
         #if canImport(FoundationModels)
         if #available(iOS 26.0, *) {
             let available = SystemLanguageModel.default.isAvailable
@@ -52,6 +62,7 @@ enum LLMResolver {
             factory: mockFactory,
             kind: .mock(reason: .sdkNotCompiledIn)
         )
+        #endif
     }
 
     #if canImport(FoundationModels)
@@ -61,20 +72,22 @@ enum LLMResolver {
     /// until handled here (no `default:` clause).
     @available(iOS 26.0, *)
     private static func mapUnavailableReason() -> MockReason {
-        guard let reason = SystemLanguageModel.default.availability.unavailableReason else {
+        switch SystemLanguageModel.default.availability {
+        case .available:
             return .modelNotAvailable
-        }
-        switch reason {
-        case .appleIntelligenceNotEnabled:
-            return .appleIntelligenceDisabled
-        case .modelNotReady:
-            return .modelNotReady
-        case .deviceNotEligible:
-            return .deviceNotEligible
-        @unknown default:
-            // SystemLanguageModel may grow new cases in later SDKs; keep
-            // forward-compat to the safest mock.
-            return .modelNotAvailable
+        case .unavailable(let reason):
+            switch reason {
+            case .appleIntelligenceNotEnabled:
+                return .appleIntelligenceDisabled
+            case .modelNotReady:
+                return .modelNotReady
+            case .deviceNotEligible:
+                return .deviceNotEligible
+            @unknown default:
+                // SystemLanguageModel may grow new cases in later SDKs; keep
+                // forward-compat to the safest mock.
+                return .modelNotAvailable
+            }
         }
     }
     #endif

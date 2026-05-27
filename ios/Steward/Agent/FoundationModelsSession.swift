@@ -111,6 +111,7 @@ actor FoundationModelsSession: LLMSession {
     private let toolMap: [String: any LLMTool]
     private let backendKind: LLMBackendKind = .foundationModels
     private let permissionSink: PermissionSignalSink
+    private let generationOptions: GenerationOptions
 
     init(
         systemPrompt: String,
@@ -121,20 +122,22 @@ actor FoundationModelsSession: LLMSession {
         self.permissionSink = sink
         let adapters = tools.map { FMToolAdapter(wrapped: $0, sink: sink) }
         self.toolMap = Dictionary(uniqueKeysWithValues: tools.map { ($0.id, $0) })
+        self.generationOptions = GenerationOptions(temperature: temperature)
 
         // Construct a fresh per-turn session (addendum §3 FM bullet:
         // "Wrap each turn in a fresh LanguageModelSession to bound KV cache").
+        // GenerationOptions moved from the session initializer to respond(to:)
+        // in the iOS 26 release SDK.
         self.session = LanguageModelSession(
-            instructions: systemPrompt,
             tools: adapters,
-            generationOptions: GenerationOptions(temperature: temperature)
+            instructions: systemPrompt
         )
     }
 
     func respond(to userMessage: String) async throws -> LLMResponse {
         // Foundation Models auto-loops tool calls within this single call.
         // We never manually loop (§4 hard reject #7). On return, the
-        // transcript carries every tool invocation the framework ran.
+        // response carries the new transcript entries for this turn.
         //
         // A tool that throws `PermissionRequiredSignal` /
         // `HealthPermissionRequiredSignal` may have its error swallowed by
@@ -147,18 +150,11 @@ actor FoundationModelsSession: LLMSession {
         // framework's wrapped error (more actionable type for the UI catch
         // arms in `ChatViewModel.send`).
         do {
-            let result = try await session.respond(to: userMessage)
+            let result = try await session.respond(to: userMessage, options: generationOptions)
             if let pending = await permissionSink.consume() {
                 throw pending
             }
-            let invocations = result.transcript.toolInvocations.map { call in
-                LLMToolInvocation(
-                    toolID: call.toolName,
-                    argsJSON: call.argumentsJSON,
-                    resultJSON: call.outputJSON,
-                    executedAt: call.timestamp
-                )
-            }
+            let invocations = Self.extractInvocations(from: result.transcriptEntries)
             return LLMResponse(
                 text: result.content,
                 toolInvocations: invocations,
@@ -170,6 +166,48 @@ actor FoundationModelsSession: LLMSession {
             }
             throw error
         }
+    }
+
+    /// Pair `ToolCall`s with their matching `ToolOutput`s by sequence position
+    /// within a single response's transcript entries. The framework emits them
+    /// interleaved (`toolCalls -> toolOutput -> toolCalls -> ...`); we flatten
+    /// to a single list keyed by name so the audit log keeps argsJSON +
+    /// resultJSON together.
+    private static func extractInvocations(
+        from entries: ArraySlice<Transcript.Entry>
+    ) -> [LLMToolInvocation] {
+        var pendingCalls: [(name: String, argsJSON: String)] = []
+        var paired: [LLMToolInvocation] = []
+        let now = Date()
+        for entry in entries {
+            switch entry {
+            case .toolCalls(let calls):
+                for call in calls {
+                    pendingCalls.append((call.toolName, call.arguments.jsonString))
+                }
+            case .toolOutput(let output):
+                let idx = pendingCalls.firstIndex(where: { $0.name == output.toolName })
+                let argsJSON = idx.map { pendingCalls.remove(at: $0).argsJSON } ?? ""
+                paired.append(LLMToolInvocation(
+                    toolID: output.toolName,
+                    argsJSON: argsJSON,
+                    resultJSON: Self.flatten(segments: output.segments),
+                    executedAt: now
+                ))
+            case .instructions, .prompt, .response:
+                continue
+            }
+        }
+        return paired
+    }
+
+    private static func flatten(segments: [Transcript.Segment]) -> String {
+        segments.map { segment in
+            switch segment {
+            case .text(let text): return text.content
+            case .structure(let structured): return structured.content.jsonString
+            }
+        }.joined()
     }
 
     func reset() async {

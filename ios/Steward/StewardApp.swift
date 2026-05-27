@@ -125,7 +125,7 @@ enum BackgroundServicesBootstrap {
         //    honest copy — v1 silently degraded to the sandbox and users
         //    looking for a Steward folder under iCloud Drive on Mac/iPad
         //    found nothing (nemesis caveat C).
-        let containerID = "iCloud.com.rajatscode.steward"
+        let containerID = "iCloud.com.rajatscode.outkeep"
         let availability = CSVMirrorAvailabilityClassifier.classify(
             mirrorEnabled: settings.csvMirrorEnabled,
             folderName: settings.icloudDriveFolder,
