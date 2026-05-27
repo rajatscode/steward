@@ -57,6 +57,14 @@ enum ToolCatalog {
             // its runtime deps when building the coordinator tool list; we
             // only contribute `cross_consult`, which is a true leaf tool).
             AgentCrossConsultTool(),
+            // Workbook (sheets) — flexible-ontology surface the agent owns.
+            SheetCreateTool(provider: provider, now: now),
+            SheetListTool(provider: provider),
+            SheetReadTool(provider: provider),
+            SheetAddColumnTool(provider: provider, now: now),
+            SheetAddRowTool(provider: provider, now: now),
+            SheetUpdateCellTool(provider: provider, now: now),
+            SheetArchiveTool(provider: provider, now: now),
             // Web — Wikipedia OpenSearch + URLSession GET. Both unkeyed,
             // public, sim-verifiable.
             WebSearchTool(),

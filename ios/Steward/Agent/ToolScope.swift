@@ -75,6 +75,17 @@ enum ToolID: String, Sendable, Codable, CaseIterable, Hashable {
     case domainUpdatePrompt = "domain.update_prompt"
     case domainArchive      = "domain.archive"
 
+    // Workbook (sheets) — the flexible-ontology replacement for the
+    // rigid seven-instrument-kind surface. The agent owns sheet shape:
+    // create a sheet, add columns, add rows, update cells, archive.
+    case sheetCreate     = "sheet.create"
+    case sheetList       = "sheet.list"
+    case sheetRead       = "sheet.read"
+    case sheetAddColumn  = "sheet.add_column"
+    case sheetAddRow     = "sheet.add_row"
+    case sheetUpdateCell = "sheet.update_cell"
+    case sheetArchive    = "sheet.archive"
+
     // Cross-agent
     case agentHandoff       = "agent.handoff"
     case agentCrossConsult  = "agent.cross_consult"

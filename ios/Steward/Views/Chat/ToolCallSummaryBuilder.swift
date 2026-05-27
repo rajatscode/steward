@@ -164,6 +164,20 @@ enum ToolCallSummaryBuilder {
             return ("searched the web", args["query"] ?? "for something")
         case .webFetch:
             return ("fetched", args["url"] ?? "a page")
+        case .sheetCreate:
+            return ("started a sheet", args["display_name"] ?? "a new sheet")
+        case .sheetList:
+            return ("checked", "sheets")
+        case .sheetRead:
+            return ("read sheet", args["sheet_id"] ?? "")
+        case .sheetAddColumn:
+            return ("added column", args["name"] ?? "to a sheet")
+        case .sheetAddRow:
+            return ("added a row", "to a sheet")
+        case .sheetUpdateCell:
+            return ("updated cell", args["column_name"] ?? "on a row")
+        case .sheetArchive:
+            return ("archived sheet", args["sheet_id"] ?? "")
         case .healthReadQuantity:
             let kind = args["type"] ?? "health data"
             return ("checked", "Apple Health \(kind)")
@@ -185,7 +199,8 @@ enum ToolCallSummaryBuilder {
              .instrumentUpdateDefinition, .instrumentArchive,
              .commitmentCreate, .commitmentComplete, .commitmentAbandon, .commitmentSnooze,
              .domainCreate, .domainUpdatePrompt, .domainArchive,
-             .memorySave, .memoryForget, .memoryStrengthen:
+             .memorySave, .memoryForget, .memoryStrengthen,
+             .sheetCreate, .sheetAddColumn, .sheetAddRow, .sheetUpdateCell, .sheetArchive:
             return true
         case .calendarRead, .reminderList,
              .eventCapture, .eventList, .eventRecentSummary,
@@ -198,6 +213,7 @@ enum ToolCallSummaryBuilder {
              .agentHandoff, .agentCrossConsult,
              .mercyModeEngage, .pauseEngage, .quietHoursSet,
              .webSearch, .webFetch,
+             .sheetList, .sheetRead,
              .healthReadQuantity:
             return false
         }
@@ -222,6 +238,8 @@ enum ToolCallSummaryBuilder {
              .agentHandoff, .agentCrossConsult,
              .mercyModeEngage, .pauseEngage, .quietHoursSet,
              .webSearch, .webFetch,
+             .sheetCreate, .sheetList, .sheetRead, .sheetAddColumn,
+             .sheetAddRow, .sheetUpdateCell, .sheetArchive,
              .healthReadQuantity:
             return false
         }

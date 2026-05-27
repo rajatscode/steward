@@ -58,6 +58,13 @@ enum Migrations {
             try addMemoryItemsArchivedAtColumn(db)
         }
 
+        // v4 — workbook substrate. Replaces the rigid seven-instrument-kind
+        // surface with a flexible sheet/column/row model the agent owns
+        // end-to-end. Additive: instruments stays put for now.
+        migrator.registerMigration("v4_workbook") { db in
+            try createWorkbookTables(db)
+        }
+
         return migrator
     }()
 
@@ -364,6 +371,64 @@ extension Migrations {
             CREATE INDEX notification_recurring_active
             ON notification_recurring_rules(kind, created_at)
             WHERE cancelled_at IS NULL
+        """)
+    }
+
+    // MARK: - workbook (sheets, columns, rows) — v4
+
+    fileprivate static func createWorkbookTables(_ db: Database) throws {
+        // sheets: the named tables the agent maintains.
+        try db.execute(sql: """
+            CREATE TABLE sheets (
+                sheet_id     TEXT PRIMARY KEY,
+                display_name TEXT NOT NULL,
+                description  TEXT,
+                created_at   INTEGER NOT NULL,
+                archived_at  INTEGER
+            )
+        """)
+        try db.execute(sql: """
+            CREATE INDEX sheets_active
+            ON sheets(created_at)
+            WHERE archived_at IS NULL
+        """)
+
+        // sheet_columns: typed schema for each sheet. UNIQUE (sheet, name)
+        // guards against duplicate columns; ordinal preserves display order.
+        try db.execute(sql: """
+            CREATE TABLE sheet_columns (
+                column_id   TEXT PRIMARY KEY,
+                sheet_id    TEXT NOT NULL REFERENCES sheets(sheet_id),
+                name        TEXT NOT NULL,
+                kind        TEXT NOT NULL,
+                unit        TEXT,
+                ordinal     INTEGER NOT NULL,
+                archived_at INTEGER,
+                UNIQUE (sheet_id, name)
+            )
+        """)
+        try db.execute(sql: """
+            CREATE INDEX sheet_columns_sheet
+            ON sheet_columns(sheet_id, ordinal)
+            WHERE archived_at IS NULL
+        """)
+
+        // sheet_rows: one record per logged entry. cells_json holds the
+        // JSON-encoded {colname: value} payload — typed validation runs in
+        // the WorkbookStore layer, not at the DB.
+        try db.execute(sql: """
+            CREATE TABLE sheet_rows (
+                row_id      TEXT PRIMARY KEY,
+                sheet_id    TEXT NOT NULL REFERENCES sheets(sheet_id),
+                created_at  INTEGER NOT NULL,
+                archived_at INTEGER,
+                cells_json  TEXT NOT NULL DEFAULT '{}'
+            )
+        """)
+        try db.execute(sql: """
+            CREATE INDEX sheet_rows_active
+            ON sheet_rows(sheet_id, created_at)
+            WHERE archived_at IS NULL
         """)
     }
 }
