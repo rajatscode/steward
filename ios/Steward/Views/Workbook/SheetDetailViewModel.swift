@@ -34,13 +34,16 @@ final class SheetDetailViewModel: ObservableObject {
     @Published private(set) var sheet: Sheet?
     @Published private(set) var columns: [SheetColumn] = []
     @Published private(set) var rows: [DisplayRow] = []
+    @Published var lastEditError: String?
 
     let sheetID: SheetID
     private let provider: DatabaseProvider
+    private let updateCellTool: SheetUpdateCellTool
 
     init(sheetID: SheetID, provider: DatabaseProvider = .shared) {
         self.sheetID = sheetID
         self.provider = provider
+        self.updateCellTool = SheetUpdateCellTool(provider: provider)
     }
 
     func load() async {
@@ -78,6 +81,46 @@ final class SheetDetailViewModel: ObservableObject {
             self.state = .loaded
         } catch {
             self.state = .failed(message: String(describing: error))
+        }
+    }
+
+    // MARK: - Edits
+
+    /// Pull the typed (un-formatted) cell value for a row+column directly
+    /// from the database. Used by the cell editor to hydrate its input
+    /// control — the in-memory DisplayRow only carries formatted strings.
+    func rawCellValue(rowID: SheetRowID, columnName: String) async -> CellValue {
+        do {
+            let db = try await provider.database()
+            return try await db.read { dbase in
+                let rows = try WorkbookStore.listRows(sheetID: self.sheetID, in: dbase)
+                let match = rows.first { $0.rowID == rowID }
+                return match?.cells[columnName] ?? .null
+            }
+        } catch {
+            return .null
+        }
+    }
+
+    /// Apply a user-driven cell edit. Routes through SheetUpdateCellTool
+    /// so the audit log gets a `sheet_update_cell` event with
+    /// `actor='user'` and a manual-correction reasoning — same audit
+    /// trail an agent edit produces. On success, reload the view-model
+    /// so the grid reflects the new value.
+    func applyCellEdit(rowID: SheetRowID, column: SheetColumn, value: CellValue) async {
+        lastEditError = nil
+        do {
+            let argsJSON = try ToolJSON.encode(SheetUpdateCellArgs(
+                rowID: rowID,
+                columnName: column.name,
+                value: value,
+                reasoning: "manual edit from the Workbook view",
+                actor: "user"
+            ))
+            _ = try await updateCellTool.invoke(argsJSON: argsJSON)
+            await load()
+        } catch {
+            lastEditError = String(describing: error)
         }
     }
 

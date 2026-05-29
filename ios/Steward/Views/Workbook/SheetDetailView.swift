@@ -12,6 +12,7 @@ import SwiftUI
 
 struct SheetDetailView: View {
     @StateObject private var viewModel: SheetDetailViewModel
+    @State private var editTarget: CellEditTarget?
 
     init(sheetID: SheetID, provider: DatabaseProvider = .shared) {
         _viewModel = StateObject(
@@ -25,6 +26,34 @@ struct SheetDetailView: View {
             .navigationBarTitleDisplayMode(.inline)
             .task { await viewModel.load() }
             .refreshable { await viewModel.load() }
+            .sheet(item: $editTarget) { target in
+                CellEditorView(
+                    target: target,
+                    onSubmit: { newValue in
+                        editTarget = nil
+                        Task {
+                            await viewModel.applyCellEdit(
+                                rowID: target.rowID,
+                                column: target.column,
+                                value: newValue
+                            )
+                        }
+                    },
+                    onCancel: { editTarget = nil }
+                )
+            }
+            .alert(
+                "Edit failed",
+                isPresented: Binding(
+                    get: { viewModel.lastEditError != nil },
+                    set: { if !$0 { viewModel.lastEditError = nil } }
+                ),
+                presenting: viewModel.lastEditError
+            ) { _ in
+                Button("OK") { viewModel.lastEditError = nil }
+            } message: { message in
+                Text(message)
+            }
     }
 
     @ViewBuilder
@@ -88,13 +117,30 @@ struct SheetDetailView: View {
                 .frame(width: Self.timestampColumnWidth, alignment: .leading)
                 .foregroundStyle(.secondary)
                 .font(.caption.monospacedDigit())
-            ForEach(row.cells) { cell in
-                cellText(cell.displayValue)
-                    .frame(width: Self.dataColumnWidth, alignment: .leading)
+            ForEach(Array(zip(row.cells, viewModel.columns)), id: \.0.id) { cell, column in
+                Button(action: { beginEdit(rowID: SheetRowID(rawValue: row.id), column: column) }) {
+                    cellText(cell.displayValue)
+                        .frame(width: Self.dataColumnWidth, alignment: .leading)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
             }
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 6)
+    }
+
+    private func beginEdit(rowID: SheetRowID, column: SheetColumn) {
+        // DisplayRow only carries formatted strings — fetch the typed
+        // value off the DB so the editor's input control hydrates with
+        // the right CellValue case. Start the sheet with `.null` so it
+        // opens fast; the awaited fetch overwrites with the real value
+        // before the user types.
+        editTarget = CellEditTarget(rowID: rowID, column: column, initialValue: .null)
+        Task { @MainActor in
+            let raw = await viewModel.rawCellValue(rowID: rowID, columnName: column.name)
+            editTarget = CellEditTarget(rowID: rowID, column: column, initialValue: raw)
+        }
     }
 
     // MARK: - Cells

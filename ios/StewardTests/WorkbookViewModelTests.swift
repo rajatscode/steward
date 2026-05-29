@@ -135,6 +135,126 @@ final class WorkbookViewModelTests: XCTestCase {
         XCTAssertTrue(vm.rows.isEmpty)
     }
 
+    // MARK: - SheetDetailViewModel.applyCellEdit
+
+    @MainActor
+    func test_applyCellEdit_updatesValueAndEmitsAuditEvent() async throws {
+        let provider = try await makeProvider()
+        let sheetID = SheetID(rawValue: "s_edit")
+        let rowID = SheetRowID(rawValue: "r_edit")
+        let columnID = SheetColumnID(rawValue: "c_minutes")
+        let db = try await provider.database()
+        try await db.write { dbase in
+            try WorkbookStore.insertSheet(
+                sheetID: sheetID, displayName: "Time", description: nil,
+                createdAt: self.referenceDate, in: dbase
+            )
+            try WorkbookStore.insertColumn(
+                columnID: columnID, sheetID: sheetID,
+                name: "minutes", kind: .duration, unit: "min", ordinal: 0, in: dbase
+            )
+            try WorkbookStore.insertRow(
+                rowID: rowID, sheetID: sheetID,
+                cells: ["minutes": .number(30)],
+                createdAt: self.referenceDate, in: dbase
+            )
+        }
+        let vm = SheetDetailViewModel(sheetID: sheetID, provider: provider)
+        await vm.load()
+        let column = vm.columns[0]
+
+        await vm.applyCellEdit(
+            rowID: rowID,
+            column: column,
+            value: .number(45)
+        )
+
+        XCTAssertNil(vm.lastEditError, "edit should succeed")
+        let storedRows = try await db.read {
+            try WorkbookStore.listRows(sheetID: sheetID, in: $0)
+        }
+        XCTAssertEqual(storedRows[0].cells["minutes"], .number(45))
+
+        // Audit assertion: the SheetUpdateCellTool emits a sheet_update_cell
+        // event with actor='user' on UI-driven edits.
+        let event = try await db.read { dbase in
+            try Row.fetchOne(
+                dbase,
+                sql: "SELECT * FROM events WHERE kind = 'sheet_update_cell' ORDER BY created_at DESC LIMIT 1"
+            )
+        }
+        XCTAssertEqual(event?["actor"] as String?, "user")
+        XCTAssertTrue((event?["reasoning"] as String? ?? "").contains("manual edit"))
+    }
+
+    @MainActor
+    func test_applyCellEdit_typeMismatch_reportsErrorAndLeavesValueUnchanged() async throws {
+        let provider = try await makeProvider()
+        let sheetID = SheetID(rawValue: "s_typed_edit")
+        let rowID = SheetRowID(rawValue: "r")
+        let db = try await provider.database()
+        try await db.write { dbase in
+            try WorkbookStore.insertSheet(
+                sheetID: sheetID, displayName: "X", description: nil,
+                createdAt: self.referenceDate, in: dbase
+            )
+            try WorkbookStore.insertColumn(
+                columnID: SheetColumnID(rawValue: "c"),
+                sheetID: sheetID,
+                name: "flag", kind: .bool, unit: nil, ordinal: 0, in: dbase
+            )
+            try WorkbookStore.insertRow(
+                rowID: rowID, sheetID: sheetID,
+                cells: ["flag": .bool(true)],
+                createdAt: self.referenceDate, in: dbase
+            )
+        }
+        let vm = SheetDetailViewModel(sheetID: sheetID, provider: provider)
+        await vm.load()
+        let column = vm.columns[0]
+
+        await vm.applyCellEdit(
+            rowID: rowID,
+            column: column,
+            value: .number(1)   // type mismatch — bool column rejecting number
+        )
+
+        XCTAssertNotNil(vm.lastEditError, "expected validation error")
+        let storedRows = try await db.read {
+            try WorkbookStore.listRows(sheetID: sheetID, in: $0)
+        }
+        XCTAssertEqual(storedRows[0].cells["flag"], .bool(true), "value must be unchanged")
+    }
+
+    @MainActor
+    func test_rawCellValue_returnsTypedValue() async throws {
+        let provider = try await makeProvider()
+        let sheetID = SheetID(rawValue: "s_raw")
+        let rowID = SheetRowID(rawValue: "r")
+        let db = try await provider.database()
+        try await db.write { dbase in
+            try WorkbookStore.insertSheet(
+                sheetID: sheetID, displayName: "Time", description: nil,
+                createdAt: self.referenceDate, in: dbase
+            )
+            try WorkbookStore.insertColumn(
+                columnID: SheetColumnID(rawValue: "c"),
+                sheetID: sheetID,
+                name: "minutes", kind: .duration, unit: "min", ordinal: 0, in: dbase
+            )
+            try WorkbookStore.insertRow(
+                rowID: rowID, sheetID: sheetID,
+                cells: ["minutes": .number(42)],
+                createdAt: self.referenceDate, in: dbase
+            )
+        }
+        let vm = SheetDetailViewModel(sheetID: sheetID, provider: provider)
+        let raw = await vm.rawCellValue(rowID: rowID, columnName: "minutes")
+        XCTAssertEqual(raw, .number(42))
+        let missing = await vm.rawCellValue(rowID: rowID, columnName: "nonexistent")
+        XCTAssertEqual(missing, .null)
+    }
+
     // MARK: - SheetDetailViewModel.formatCell
 
     func test_formatCell_durationCombinesHoursAndMinutes() {
