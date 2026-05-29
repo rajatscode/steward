@@ -13,7 +13,7 @@ import SwiftUI
 struct RootTabView: View {
     @EnvironmentObject private var bootstrap: AppBootstrap
 
-    enum Tab: Hashable { case chat, today, settings }
+    enum Tab: Hashable { case chat, today, workbook, settings }
 
     @State private var selectedTab: Tab = .chat
 
@@ -30,6 +30,12 @@ struct RootTabView: View {
                     Label("Today", systemImage: "sun.horizon")
                 }
                 .tag(Tab.today)
+
+            WorkbookView()
+                .tabItem {
+                    Label("Workbook", systemImage: "rectangle.split.3x3")
+                }
+                .tag(Tab.workbook)
 
             SettingsView(selectedTab: $selectedTab)
                 .tabItem {

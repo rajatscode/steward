@@ -66,7 +66,13 @@ final class ChatViewModel: ObservableObject {
     @Published private(set) var lastError: String?
 
     /// The greeting bubble + chip pair displays iff this is true.
-    var shouldShowEmptyState: Bool { !hasAnyHistory && !hasAnyDomains }
+    /// Gated on the in-memory transcript too — Branch B turns don't write
+    /// any `actor='user'` events (no tool calls fire), so `hasAnyHistory`
+    /// alone would flip back to `false` after `refreshHistoryFlags()` and
+    /// erase the user's "walk me through it" turn from view.
+    var shouldShowEmptyState: Bool {
+        !hasAnyHistory && !hasAnyDomains && messages.isEmpty
+    }
 
     /// Persistent placeholder picked once per cold launch from §1.5.
     let placeholderText: String
